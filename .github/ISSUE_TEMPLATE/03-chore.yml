@@ -1,0 +1,66 @@
+name: 🧹 Chore
+description: Maintenance, dependencies, tooling, or config. No user-facing change.
+title: "[CHORE] "
+labels: ["type:chore"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What needs doing?
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why now?
+      description: Chores compete with features. What makes this worth doing?
+    validations:
+      required: true
+
+  - type: textarea
+    id: risk
+    attributes:
+      label: Risk of not doing it
+      description: >
+        Does it get worse over time? Block something later? If the honest
+        answer is "nothing much", label it `priority:p3` and let it wait.
+      placeholder: |
+        Each new migration without this makes the drift gate slower, and
+        the M5 work will hit it.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      multiple: true
+      options:
+        - auth
+        - accounts
+        - transactions
+        - categories
+        - budgets
+        - goals
+        - timeline
+        - sts
+        - dashboard
+        - reports
+        - db
+        - rls
+        - ci
+        - ui
+        - a11y
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      value: |
+        - [ ]
+        - [ ]
+    validations:
+      required: true

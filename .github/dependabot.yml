@@ -1,0 +1,100 @@
+version: 2
+
+updates:
+  # GitHub Actions. This is the important one right now: every third-party
+  # action in .github/workflows/ is pinned to a full commit SHA (a tag is
+  # mutable, and a CI runner has repository write potential). Pinning without
+  # automated bumps means the pins silently rot, so this entry is what makes
+  # the SHA-pinning policy sustainable rather than a burden.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Asia/Manila
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+      include: scope
+    labels:
+      - "type:chore"
+      - "stream:devops"
+      - "area:ci"
+    groups:
+      # One PR for routine action bumps rather than five. Security updates
+      # still arrive separately and immediately.
+      actions-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+
+  # npm. Harmless and inert until package.json exists (M0-B01); present from
+  # day one so no one has to remember to add it later.
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:15"
+      timezone: Asia/Manila
+    open-pull-requests-limit: 10
+    versioning-strategy: increase
+    commit-message:
+      prefix: "chore"
+      prefix-development: "chore"
+      include: scope
+    labels:
+      - "type:chore"
+      - "stream:devops"
+    groups:
+      # Next and React must move together — a mismatched pair breaks the build
+      # in ways that are tedious to bisect.
+      next-react:
+        patterns:
+          - "next"
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+          - "eslint-config-next"
+      supabase:
+        patterns:
+          - "@supabase/*"
+          - "supabase"
+      test-tooling:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+          - "@playwright/*"
+          - "playwright"
+          - "happy-dom"
+          - "jsdom"
+      lint-tooling:
+        patterns:
+          - "eslint"
+          - "eslint-*"
+          - "@eslint/*"
+          - "typescript-eslint"
+          - "prettier"
+          - "prettier-*"
+      dev-minor-patch:
+        applies-to: version-updates
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # Major upgrades of the framework or the language are deliberate,
+      # planned work with a migration guide — not a Monday-morning PR.
+      - dependency-name: "next"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "tailwindcss"
+        update-types: ["version-update:semver-major"]

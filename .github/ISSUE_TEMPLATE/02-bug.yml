@@ -1,0 +1,125 @@
+name: 🐛 Bug report
+description: Something behaves incorrectly.
+title: "[BUG] "
+labels: ["type:bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        > [!CAUTION]
+        > **Do not report security vulnerabilities here.** Use
+        > [private vulnerability reporting](https://github.com/jorge/whered-my-money-go/security/advisories/new)
+        > instead. See [SECURITY.md](https://github.com/jorge/whered-my-money-go/blob/main/SECURITY.md).
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: One or two sentences.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+      description: What should have happened, and which doc or spec section says so?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: Include exact numbers for anything money-related, and any error message verbatim.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: severity-signals
+    attributes:
+      label: Impact
+      description: >
+        These two decide whether this is triaged as priority:p0. Money math and
+        data loss are unrecoverable in a way that a layout glitch is not.
+      options:
+        - label: This involves incorrect money math (a wrong balance, total, or projection)
+          required: false
+        - label: This causes data loss, data corruption, or exposes another user's data
+          required: false
+        - label: This blocks a core flow entirely (cannot sign in, cannot add a transaction)
+          required: false
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - "p0 — drop everything: data loss, wrong money, cross-user exposure"
+        - "p1 — this milestone: a core flow is broken"
+        - "p2 — next milestone: wrong but with a workaround"
+        - "p3 — someday: cosmetic or rare"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      multiple: true
+      options:
+        - auth
+        - accounts
+        - transactions
+        - categories
+        - budgets
+        - goals
+        - timeline
+        - sts
+        - dashboard
+        - reports
+        - db
+        - rls
+        - ci
+        - ui
+        - a11y
+    validations:
+      required: true
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Where did this happen?
+      options:
+        - "local development"
+        - "preview deployment"
+        - "production"
+    validations:
+      required: true
+
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and OS
+      placeholder: "Chrome 141 on Windows 11 / Safari on iOS 18"
+    validations:
+      required: false
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots, recording, or logs
+      description: Redact any real financial figures you would rather not publish.
+    validations:
+      required: false
