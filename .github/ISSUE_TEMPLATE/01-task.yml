@@ -1,0 +1,154 @@
+name: 📋 Task or feature
+description: A unit of implementation work within a milestone.
+title: "[M?][??] "
+labels: ["type:task"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing, skim [`tasks/README.md`](https://github.com/jorge/whered-my-money-go/blob/main/tasks/README.md)
+        and the [Definition of Ready](https://github.com/jorge/whered-my-money-go/blob/main/workflow/07-definition-of-ready-and-done.md).
+
+        **Title format:** `[M7][BE] Implement computeSafeToSpend in lib/core`
+        — milestone and stream up front, then a `<verb> <object>` phrase. This
+        makes any list view readable without opening issues.
+
+        Stream codes: `FE` frontend · `BE` backend · `SH` shared · `DO` devops
+
+  - type: dropdown
+    id: stream
+    attributes:
+      label: Stream
+      description: Which part of the codebase does this touch? See the ownership table in `docs/architecture/source-structure.md`.
+      options:
+        - "frontend — app/**, components/**"
+        - "backend — lib/core/**, lib/server/**, supabase/**"
+        - "shared — lib/validation, lib/utils, contracts, types"
+        - "devops — CI, workflows, deploy config, E2E"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: milestone
+    attributes:
+      label: Milestone
+      description: >
+        Issue forms cannot set the real GitHub Milestone field, so this is a
+        triage input — a human (or the labeler workflow) assigns the actual
+        milestone.
+      options:
+        - "M0 — Foundation & Toolchain"
+        - "M1 — Auth & Profile"
+        - "M2 — Accounts"
+        - "M3 — Transactions & Categories"
+        - "M4 — Dashboard Core"
+        - "M5 — Budgets"
+        - "M6 — Savings Goals"
+        - "M7 — Safe to Spend"
+        - "M8 — Money Timeline"
+        - "M9 — MVP Hardening & Launch"
+        - "V2 — post-MVP"
+        - "V3 — long term"
+        - "Unscheduled"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: Type
+      options:
+        - "task — implementation unit"
+        - "feature — new user-facing capability"
+        - "contract — schema/types/validation that unblocks another stream"
+        - "chore — maintenance, deps, config"
+        - "docs — documentation"
+        - "test — test-only work"
+        - "security — security-relevant"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Subsystem(s). Mirrors the commit scopes in `workflow/03-commits.md`.
+      multiple: true
+      options:
+        - auth
+        - accounts
+        - transactions
+        - categories
+        - budgets
+        - goals
+        - timeline
+        - sts
+        - dashboard
+        - reports
+        - db
+        - rls
+        - ci
+        - ui
+        - a11y
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context — why does this exist?
+      description: What problem does it solve, and which spec section or doc does it come from?
+      placeholder: |
+        Spec §9 requires a Safe to Spend number that the user can drill into.
+        The algorithm is specified in docs/domain/safe-to-spend.md.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Specific and verifiable. "Works correctly" is not a criterion.
+      value: |
+        - [ ]
+        - [ ]
+        - [ ]
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Implementation notes
+      description: Which files will likely be touched? Any approach already decided?
+      placeholder: |
+        Files: lib/core/safe-to-spend/compute.ts, lib/core/safe-to-spend/types.ts
+        Pure function, `today` injected. Returns the per-term breakdown, not a scalar.
+    validations:
+      required: false
+
+  - type: input
+    id: depends
+    attributes:
+      label: Depends on
+      description: Issue references that must land first. A frontend task usually depends on its milestone's `type:contract` task.
+      placeholder: "#41, #43"
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: dor
+    attributes:
+      label: Definition of Ready
+      description: Confirming these now is what stops a task stalling later.
+      options:
+        - label: The title is `[M#][XX] <verb> <object>`
+          required: true
+        - label: Acceptance criteria above are specific and verifiable
+          required: true
+        - label: Dependencies are linked, and are either done or in flight
+          required: true
+        - label: This is small enough to land in a single pull request
+          required: true
+        - label: If this is a frontend task needing data, the contract task exists
+          required: false

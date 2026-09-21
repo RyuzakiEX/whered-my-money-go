@@ -1,0 +1,86 @@
+name: 🔬 Spike
+description: A timeboxed investigation to answer a question or unblock a decision.
+title: "[SPIKE] "
+labels: ["type:spike"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        > [!IMPORTANT]
+        > **A spike never merges production code.** Its output is knowledge — a
+        > document, an ADR, or a prototype that gets thrown away. If you find
+        > yourself wanting to keep the code, close the spike and file the real
+        > task instead.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Question to answer
+      description: One specific, answerable question. Not a topic to explore.
+      placeholder: |
+        Good: "Can Supabase RLS express the household-sharing model in §V3-M25
+        without a security definer function?"
+
+        Too vague: "Look into multi-tenancy."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: timebox
+    attributes:
+      label: Timebox
+      description: >
+        Hard stop. When it expires you write up what you learned even if the
+        answer is "still unclear" — that is a valid, useful outcome.
+      options:
+        - "2 hours"
+        - "4 hours"
+        - "1 day"
+        - "2 days"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deliverable
+    attributes:
+      label: What does "done" produce?
+      options:
+        - "A written finding in the issue"
+        - "A new doc under docs/"
+        - "An ADR recording a decision"
+        - "A throwaway prototype plus a written finding"
+    validations:
+      required: true
+
+  - type: textarea
+    id: decision
+    attributes:
+      label: Which decision does this unblock?
+      description: Name the task, milestone, or ADR that is waiting on the answer.
+      placeholder: "Blocks M8-B01: whether recurrence expansion needs a date library after all."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      multiple: true
+      options:
+        - auth
+        - accounts
+        - transactions
+        - categories
+        - budgets
+        - goals
+        - timeline
+        - sts
+        - dashboard
+        - reports
+        - db
+        - rls
+        - ci
+        - ui
+        - a11y
+    validations:
+      required: true

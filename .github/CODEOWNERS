@@ -1,0 +1,44 @@
+# Code owners.
+#
+# Solo project today, so a single catch-all. The commented rules below are the
+# intended split when a second person joins — they double as documentation of
+# which areas need which expertise.
+#
+# > IMPORTANT: leave branch protection's "Require review from Code Owners"
+# > OFF while this is a single-owner file. GitHub does not let you approve your
+# > own PR, so requiring code-owner review on a solo repo blocks every merge.
+# > Turn it on in the same change that adds a second owner.
+
+* @jorge
+
+# ---------------------------------------------------------------------------
+# Future per-path ownership (uncomment as the team grows)
+# ---------------------------------------------------------------------------
+
+# Frontend — UI, routing, accessibility
+# /app/                       @frontend-owner
+# /components/                @frontend-owner
+
+# Money math. The product IS this code; review it like it can lose someone's
+# savings, because a bug here does exactly that.
+# /lib/core/                  @backend-owner @owner
+
+# Schema and data isolation. A wrong RLS policy is a data breach.
+# /supabase/                  @backend-owner @owner
+# /supabase/tests/rls/        @backend-owner @owner
+
+# Server-side data access and Server Actions — the authorization boundary.
+# /lib/server/                @backend-owner
+
+# CI has repository write potential; a compromised workflow is a supply-chain
+# problem, not a build problem.
+# /.github/workflows/         @devops-owner @owner
+# /.github/actions/           @devops-owner @owner
+
+# Architecture decisions outlive the people who make them.
+# /docs/architecture/         @owner
+# /docs/adr/                  @owner
+# /docs/security/             @owner @security-reviewer
+
+# Process changes affect everyone, so everyone should see them.
+# /workflow/                  @owner

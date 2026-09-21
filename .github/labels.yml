@@ -1,0 +1,166 @@
+# Machine-readable label definitions — mirrors tasks/labels.md.
+#
+# Consumed by a label-sync action (or `gh label create`) so the label set is
+# reproducible rather than hand-maintained. When editing, change BOTH this file
+# and tasks/labels.md; the human-readable doc is where the reasoning lives.
+#
+# Four dimensions. Every task carries one of each, plus a GitHub Milestone.
+
+# ---------------------------------------------------------------------------
+# stream — which part of the codebase (see docs/architecture/source-structure.md)
+# ---------------------------------------------------------------------------
+- name: "stream:frontend"
+  color: "1D76DB"
+  description: "app/**, components/** — UI, routing, accessibility"
+
+- name: "stream:backend"
+  color: "0E8A16"
+  description: "lib/core/**, lib/server/**, supabase/** — data, math, schema"
+
+- name: "stream:shared"
+  color: "5319E7"
+  description: "Contracts, types, validation — cross-cutting"
+
+- name: "stream:devops"
+  color: "B60205"
+  description: "CI, workflows, deploy config, E2E"
+
+# ---------------------------------------------------------------------------
+# type — what kind of work
+# ---------------------------------------------------------------------------
+- name: "type:feature"
+  color: "A2EEEF"
+  description: "New user-facing capability"
+
+- name: "type:task"
+  color: "C5DEF5"
+  description: "Implementation unit of a feature"
+
+- name: "type:contract"
+  color: "FBCA04"
+  description: "Schema/types/validation that unblocks another stream — land first"
+
+- name: "type:bug"
+  color: "D73A4A"
+  description: "Defect"
+
+- name: "type:chore"
+  color: "EDEDED"
+  description: "Maintenance, dependencies, config"
+
+- name: "type:docs"
+  color: "0075CA"
+  description: "Documentation"
+
+- name: "type:test"
+  color: "BFD4F2"
+  description: "Test-only work"
+
+- name: "type:spike"
+  color: "D4C5F9"
+  description: "Timeboxed research — never merges production code"
+
+- name: "type:security"
+  color: "B60205"
+  description: "Security-relevant"
+
+# ---------------------------------------------------------------------------
+# priority
+# ---------------------------------------------------------------------------
+- name: "priority:p0"
+  color: "B60205"
+  description: "Drop everything — data loss, wrong money, cross-user exposure"
+
+- name: "priority:p1"
+  color: "D93F0B"
+  description: "This milestone"
+
+- name: "priority:p2"
+  color: "FEF2C0"
+  description: "Next milestone"
+
+- name: "priority:p3"
+  color: "EEEEEE"
+  description: "Someday"
+
+# ---------------------------------------------------------------------------
+# area — subsystem. Mirrors the commit scopes in workflow/03-commits.md.
+# ---------------------------------------------------------------------------
+- name: "area:auth"
+  color: "BFDADC"
+  description: "Authentication, sessions, profile"
+
+- name: "area:accounts"
+  color: "BFDADC"
+  description: "Financial accounts and balances"
+
+- name: "area:transactions"
+  color: "BFDADC"
+  description: "Income, expenses, transfers"
+
+- name: "area:categories"
+  color: "BFDADC"
+  description: "Category management and seeding"
+
+- name: "area:budgets"
+  color: "BFDADC"
+  description: "Budgets, progress, forecasting"
+
+- name: "area:goals"
+  color: "BFDADC"
+  description: "Savings goals and contributions"
+
+- name: "area:timeline"
+  color: "BFDADC"
+  description: "Money Timeline and recurrence"
+
+- name: "area:sts"
+  color: "BFDADC"
+  description: "Safe to Spend"
+
+- name: "area:dashboard"
+  color: "BFDADC"
+  description: "Dashboard tiles, charts, widgets"
+
+- name: "area:reports"
+  color: "BFDADC"
+  description: "Reports and exports"
+
+- name: "area:db"
+  color: "BFDADC"
+  description: "Schema, migrations, queries"
+
+- name: "area:rls"
+  color: "BFDADC"
+  description: "Row Level Security policies and isolation tests"
+
+- name: "area:ci"
+  color: "BFDADC"
+  description: "CI workflows and quality gates"
+
+- name: "area:ui"
+  color: "BFDADC"
+  description: "Design system, components, layout"
+
+- name: "area:a11y"
+  color: "BFDADC"
+  description: "Accessibility"
+
+# ---------------------------------------------------------------------------
+# status — workflow state not covered by the project board
+# ---------------------------------------------------------------------------
+- name: "status:blocked"
+  color: "000000"
+  description: "Waiting on a dependency"
+
+- name: "status:ready"
+  color: "0E8A16"
+  description: "Meets the Definition of Ready — safe to pick up"
+
+- name: "status:needs-info"
+  color: "FBCA04"
+  description: "Under-specified — cannot start"
+
+- name: "good-first-task"
+  color: "7057FF"
+  description: "Small and self-contained"

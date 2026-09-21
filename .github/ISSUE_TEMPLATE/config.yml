@@ -1,0 +1,21 @@
+# Blank issues are disabled deliberately: the forms below collect what triage
+# actually needs (stream, milestone, acceptance criteria). A blank issue is a
+# note-to-self that stalls, not a task someone can pick up.
+blank_issues_enabled: false
+
+contact_links:
+  - name: 📋 Backlog and task conventions
+    url: https://github.com/jorge/whered-my-money-go/blob/main/tasks/README.md
+    about: How milestones, streams, labels, and task IDs work. Read before filing.
+
+  - name: 🔧 Development process
+    url: https://github.com/jorge/whered-my-money-go/blob/main/workflow/README.md
+    about: Branching, commits, pull requests, CI gates, definition of done.
+
+  - name: 🏛️ Architecture documentation
+    url: https://github.com/jorge/whered-my-money-go/blob/main/docs/architecture/README.md
+    about: How the system is built and why. Check here before proposing a change.
+
+  - name: 🔒 Report a security vulnerability
+    url: https://github.com/jorge/whered-my-money-go/security/advisories/new
+    about: Do NOT open a public issue for a vulnerability. Report it privately here.
