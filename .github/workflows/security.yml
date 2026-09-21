@@ -1,0 +1,189 @@
+# Security scanning: secrets, vulnerabilities, misconfiguration, dependencies.
+#
+# gitleaks and Trivy run UNCONDITIONALLY — they are meaningful from the first
+# commit, before any application code exists. gitleaks scans git history for
+# secrets; Trivy's misconfig scanner finds problems in these very workflow
+# files. The dependency jobs gate on a lockfile.
+#
+# Branch protection should require the `security` aggregate gate.
+# See docs/security/ci-security-gates.md for triage and suppression policy.
+name: security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Mondays 06:17 UTC. An off-peak, non-round minute — the top of the hour is
+    # heavily contended on GitHub's shared runners and delays scheduled jobs.
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  gitleaks:
+    name: gitleaks (secret scan)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          # Full history. A shallow clone scans only the tip commit, which
+          # misses the case this gate exists for: a secret committed earlier
+          # and "removed" in a later commit while staying in history.
+          fetch-depth: 0
+
+      - uses: gitleaks/gitleaks-action@83373cf2f8c4db6e24b41c1a9b086bb9619e9cd3 # v2.3.7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: "false"
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "true"
+          # GITLEAKS_LICENSE is only required for GitHub *organization*
+          # accounts. Personal/public repos need none.
+
+  trivy:
+    name: trivy (vuln + secret + misconfig)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write # SARIF upload to the Security tab
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      # Pass 1 — report everything, never fail. Feeds the Security tab so
+      # findings accumulate as history even on main.
+      - name: Scan (report)
+        uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4 # v0.32.0
+        with:
+          scan-type: fs
+          scanners: vuln,secret,misconfig
+          format: sarif
+          output: trivy.sarif
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "0"
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@4e94bd11f71e507f7f87df81788dff88d1dacbfb # v3.29.0
+        with:
+          sarif_file: trivy.sarif
+          category: trivy
+
+      # Pass 2 — the actual gate, PRs only. Splitting the passes means a
+      # newly-disclosed CVE in a dependency does not retroactively turn main
+      # red, while a PR that introduces one is blocked.
+      - name: Gate on HIGH/CRITICAL (pull requests)
+        if: github.event_name == 'pull_request'
+        uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4 # v0.32.0
+        with:
+          scan-type: fs
+          scanners: vuln,misconfig
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+          trivyignores: .trivyignore
+
+  dependency-review:
+    name: dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write # to post the summary comment on failure
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      # No-ops harmlessly when the PR touches no manifest.
+      - uses: actions/dependency-review-action@da24556b548a50705dd671f47852072ea4c105d9 # v4.7.1
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure
+          # Copyleft licences are incompatible with a hosted SaaS product.
+          deny-licenses: AGPL-3.0, AGPL-3.0-only, AGPL-3.0-or-later, GPL-3.0, GPL-3.0-only, GPL-3.0-or-later
+
+  npm-audit:
+    name: npm audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - id: detect
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f package-lock.json ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "No package-lock.json — nothing to audit yet."
+          fi
+
+      - uses: ./.github/actions/setup-node-project
+        if: steps.detect.outputs.run == 'true'
+        with:
+          install: "false"
+
+      # Production dependencies are the gate: a dev-only advisory should not
+      # block a PR, since it never reaches a user's browser or our server.
+      - name: Audit production dependencies (blocking)
+        if: steps.detect.outputs.run == 'true'
+        run: npm audit --audit-level=high --omit=dev
+
+      # Full audit is informational — visible in the summary, never blocking.
+      - name: Audit all dependencies (informational)
+        if: steps.detect.outputs.run == 'true'
+        continue-on-error: true
+        shell: bash
+        run: |
+          {
+            echo "### npm audit (all dependencies, informational)"
+            echo ""
+            echo '```text'
+            npm audit 2>&1 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  # Aggregate gate — the required status check for this workflow.
+  # ---------------------------------------------------------------------------
+  security:
+    name: security
+    needs: [gitleaks, trivy, dependency-review, npm-audit]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check results
+        shell: bash
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          echo "$NEEDS"
+
+          failed=$(printf '%s' "$NEEDS" | grep -o '"result": *"failure"' | wc -l)
+          cancelled=$(printf '%s' "$NEEDS" | grep -o '"result": *"cancelled"' | wc -l)
+
+          {
+            echo "### Security aggregate gate"
+            echo ""
+            echo "- failures: $failed"
+            echo "- cancellations: $cancelled"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$failed" -gt 0 ] || [ "$cancelled" -gt 0 ]; then
+            echo "::error::A security gate failed. See docs/security/ci-security-gates.md for triage."
+            exit 1
+          fi
+          echo "All security gates passed or were skipped."

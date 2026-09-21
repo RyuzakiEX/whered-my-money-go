@@ -1,0 +1,78 @@
+# CodeQL static analysis.
+#
+# The `actions` language is included and it works TODAY, before any application
+# code exists: it analyses the workflow files themselves for script injection,
+# excessive permissions, and untrusted-input flows. That is genuine value on a
+# docs-only repo.
+#
+# This repo is public, so CodeQL and SARIF upload are available at no cost. On
+# a private repo both require GitHub Advanced Security — if this ever goes
+# private, gate the workflow on `github.event.repository.private == false`
+# rather than leaving a permanently red check.
+name: codeql
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Tuesdays 04:33 UTC — deliberately offset from the security workflow so
+    # the two do not contend for runners.
+    - cron: "33 4 * * 2"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  analyze:
+    name: codeql (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Analyses .github/workflows/**. Valid from commit one.
+          - language: actions
+            enabled: true
+          # Skips until package.json exists. `hashFiles` returns '' when no
+          # file matches, which is the cleanest available skip predicate for a
+          # standalone workflow with no preflight job.
+          - language: javascript-typescript
+            enabled: ${{ hashFiles('package.json') != '' }}
+
+    steps:
+      - name: Checkout
+        if: matrix.enabled
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Initialize CodeQL
+        if: matrix.enabled
+        uses: github/codeql-action/init@4e94bd11f71e507f7f87df81788dff88d1dacbfb # v3.29.0
+        with:
+          languages: ${{ matrix.language }}
+          # security-extended adds lower-severity and higher-precision queries
+          # beyond the default set. Worth the extra minutes on financial code.
+          queries: security-extended
+
+      - name: Analyze
+        if: matrix.enabled
+        uses: github/codeql-action/analyze@4e94bd11f71e507f7f87df81788dff88d1dacbfb # v3.29.0
+        with:
+          category: "/language:${{ matrix.language }}"
+
+      - name: Note skip
+        if: ${{ !matrix.enabled }}
+        run: |
+          echo "### CodeQL — ${{ matrix.language }}: skipped" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "No application code yet. Activated by M0." >> "$GITHUB_STEP_SUMMARY"

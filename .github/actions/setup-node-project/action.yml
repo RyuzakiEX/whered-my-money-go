@@ -1,0 +1,96 @@
+name: Setup Node project
+description: >
+  Sets up Node with caching and installs dependencies, tolerating a repository
+  that has no package.json or no lockfile yet. Used by every code workflow so
+  the setup logic lives in one place.
+
+inputs:
+  install:
+    description: Whether to install dependencies.
+    required: false
+    default: "true"
+
+outputs:
+  installed:
+    description: "'true' if dependencies were installed."
+    value: ${{ steps.install.outputs.installed }}
+  node-version:
+    description: The Node version that was set up.
+    value: ${{ steps.node.outputs.node-version }}
+
+runs:
+  using: composite
+  steps:
+    # Detect what the repo actually has before touching setup-node. Its
+    # `cache: npm` option HARD FAILS when no lockfile exists, which would turn
+    # a legitimately-empty repo into a red build.
+    - id: detect
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [ -f package.json ]; then
+          echo "has_package=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "has_package=false" >> "$GITHUB_OUTPUT"
+        fi
+        if [ -f package-lock.json ]; then
+          echo "lock=npm" >> "$GITHUB_OUTPUT"
+        elif [ -f pnpm-lock.yaml ]; then
+          echo "lock=pnpm" >> "$GITHUB_OUTPUT"
+        else
+          echo "lock=none" >> "$GITHUB_OUTPUT"
+        fi
+        if [ -f .nvmrc ]; then
+          echo "has_nvmrc=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "has_nvmrc=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    # Two variants because node-version-file errors if the file is absent,
+    # and cache errors if the lockfile is absent. Composite actions have no
+    # conditional inputs, so the condition goes on the step.
+    - id: node
+      if: steps.detect.outputs.has_nvmrc == 'true' && steps.detect.outputs.lock == 'npm'
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      with:
+        node-version-file: .nvmrc
+        cache: npm
+
+    - id: node-no-cache
+      if: steps.detect.outputs.has_nvmrc == 'true' && steps.detect.outputs.lock != 'npm'
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      with:
+        node-version-file: .nvmrc
+
+    - id: node-fallback
+      if: steps.detect.outputs.has_nvmrc != 'true'
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      with:
+        node-version: "22"
+
+    - id: install
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [ "${{ inputs.install }}" != "true" ] || [ "${{ steps.detect.outputs.has_package }}" != "true" ]; then
+          echo "installed=false" >> "$GITHUB_OUTPUT"
+          echo "No package.json (or install disabled) — skipping dependency install."
+          exit 0
+        fi
+        case "${{ steps.detect.outputs.lock }}" in
+          npm)
+            # `npm ci` is the only reproducible install: it fails if
+            # package.json and the lockfile disagree, rather than silently
+            # resolving something new.
+            npm ci --no-audit --no-fund
+            ;;
+          pnpm)
+            corepack enable
+            pnpm install --frozen-lockfile
+            ;;
+          none)
+            echo "::warning::No lockfile found — installing unpinned. Commit a lockfile."
+            npm install --no-audit --no-fund
+            ;;
+        esac
+        echo "installed=true" >> "$GITHUB_OUTPUT"
