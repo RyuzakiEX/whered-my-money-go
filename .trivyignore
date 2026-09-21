@@ -1,0 +1,26 @@
+# Trivy suppressions
+#
+# Run locally the way CI does:
+#   docker run --rm -v "${PWD}:/repo" aquasec/trivy:latest fs \
+#     --scanners vuln,secret,misconfig --severity HIGH,CRITICAL /repo
+#
+# RULES FOR ADDING AN ENTRY (see docs/security/ci-security-gates.md):
+#
+#   1. Every entry needs a CVE/AVD id, a one-line reason, an owner, and an
+#      expiry date. An undated suppression is a permanent blind spot.
+#   2. Suppress only what is genuinely not exploitable here — a vulnerable
+#      code path we never call, or a dev-only dependency that never ships.
+#      "It's noisy" is not a reason.
+#   3. Prefer upgrading. `ignore-unfixed: true` is already set in CI, so
+#      anything appearing here HAS a fix available.
+#   4. Re-review on expiry. The scheduled Monday scan will resurface it.
+#
+# Format:
+#   CVE-2025-12345 exp:2026-03-01
+#   # why: <not exploitable because …>  owner: @jorge
+#
+# ---------------------------------------------------------------------------
+# Active suppressions
+# ---------------------------------------------------------------------------
+
+# (none — keep it that way)

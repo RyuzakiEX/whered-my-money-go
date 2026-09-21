@@ -1,0 +1,105 @@
+# Gitleaks configuration — secret scanning
+#
+# Run locally the way CI does:
+#   docker run --rm -v "${PWD}:/repo" zricethezav/gitleaks:latest detect \
+#     --source=/repo --config=/repo/.gitleaks.toml --verbose
+#
+# See docs/security/ci-security-gates.md for triage and suppression process.
+
+title = "whered-my-money-go"
+
+# Start from the maintained default ruleset, then add project-specific rules.
+[extend]
+useDefault = true
+
+# ---------------------------------------------------------------------------
+# Project-specific rules
+# ---------------------------------------------------------------------------
+
+# Supabase secret API keys (new-style, issued from 2025 onward).
+# These bypass row level security entirely — the highest-value secret here.
+[[rules]]
+id = "supabase-secret-key"
+description = "Supabase secret key (sb_secret_*)"
+regex = '''sb_secret_[A-Za-z0-9_-]{20,}'''
+tags = ["supabase", "key", "critical"]
+
+# Supabase publishable keys are NOT secret, but flagging them is still useful:
+# finding one hardcoded means someone bypassed the env-var contract.
+[[rules]]
+id = "supabase-publishable-key-hardcoded"
+description = "Hardcoded Supabase publishable key (should come from env)"
+regex = '''sb_publishable_[A-Za-z0-9_-]{20,}'''
+tags = ["supabase", "hygiene"]
+
+# Legacy service_role JWT. The `service_role` claim is the tell — an anon-role
+# JWT is public by design, a service_role JWT is a full database bypass.
+[[rules]]
+id = "supabase-service-role-jwt"
+description = "Supabase service_role JWT (full RLS bypass)"
+regex = '''eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]*c2VydmljZV9yb2xl[A-Za-z0-9_-]*\.[A-Za-z0-9_-]{10,}'''
+tags = ["supabase", "jwt", "critical"]
+
+# Postgres connection strings carrying a real password.
+[[rules]]
+id = "postgres-connection-string-with-password"
+description = "Postgres URI with an embedded password"
+regex = '''postgres(?:ql)?://[^:\s/]+:[^@\s]{8,}@[^\s/]+'''
+tags = ["database", "credentials"]
+  [rules.allowlist]
+  description = "Local Supabase default credentials are public knowledge"
+  regexes = [
+    '''postgres(?:ql)?://postgres:postgres@(?:127\.0\.0\.1|localhost)''',
+  ]
+
+# ---------------------------------------------------------------------------
+# Global allowlist
+# ---------------------------------------------------------------------------
+[allowlist]
+description = "Documentation examples and local development defaults"
+
+paths = [
+  # The product spec and domain docs are full of ₱ amounts, `auth.uid()`
+  # snippets, and worked examples that sit adjacent to secret patterns
+  # without being secrets.
+  '''docs/product/product-spec\.md''',
+  '''docs/domain/.*\.md''',
+  '''docs/architecture/rls-policies\.md''',
+  '''docs/security/.*\.md''',
+
+  # The env contract declares variable names with empty values by design.
+  '''\.env\.example$''',
+
+  # This config necessarily contains the patterns it detects.
+  '''\.gitleaks\.toml$''',
+
+  # Lockfiles carry integrity hashes that look like high-entropy secrets.
+  '''package-lock\.json$''',
+  '''pnpm-lock\.yaml$''',
+]
+
+regexes = [
+  # Documented placeholders — if someone commits one of these literally,
+  # they have committed a placeholder, not a credential.
+  '''your[-_]?(?:supabase|project|anon|service)[-_]?(?:url|key|ref|id)?''',
+  '''(?i)(?:REPLACE_ME|CHANGEME|PLACEHOLDER|EXAMPLE|DUMMY|FIXME|xxxxx+)''',
+
+  # Local Supabase fixed defaults. `supabase start` prints the same anon and
+  # service keys for every developer on earth; they are demo values, and the
+  # local stack is not reachable from the internet.
+  '''127\.0\.0\.1:54321''',
+  '''127\.0\.0\.1:54322''',
+  '''localhost:54321''',
+  '''localhost:54322''',
+
+  # Illustrative amounts and section references in docs.
+  '''₱[\d,\.]+''',
+]
+
+stopwords = [
+  "example",
+  "placeholder",
+  "sample",
+  "fixture",
+  "yourproject",
+]
