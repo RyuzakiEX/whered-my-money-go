@@ -1,0 +1,60 @@
+{
+  // Markdown lint rules for the docs gate (.github/workflows/docs.yml).
+  // Run locally: npx markdownlint-cli2 "**/*.md"
+  "config": {
+    "default": true,
+
+    // Line length: prose and tables wrap awkwardly under a hard cap, and
+    // reflowing a table to satisfy a linter makes the source worse.
+    "MD013": false,
+
+    // Inline HTML: needed for shields.io badges and <br> inside table cells.
+    "MD033": false,
+
+    // Duplicate headings: allowed when nested under different parents
+    // (many docs repeat "Rationale" or "Edge cases" per section).
+    "MD024": { "siblings_only": true },
+
+    // First line in file need not be a heading — several docs open with a
+    // badge block or a frontmatter-style metadata table.
+    "MD041": false,
+
+    // Bare URLs are fine inside fenced code blocks; the rule already
+    // ignores those, but link-reference style is not enforced here.
+    "MD034": true,
+
+    // Enforce ATX headings (### not underlines) and one H1 per file.
+    "MD003": { "style": "atx" },
+    "MD025": { "level": 1 },
+
+    // Ordered lists: allow "1." repeated, since renumbering on every edit
+    // creates noisy diffs.
+    "MD029": { "style": "one_or_ordered" },
+
+    // Unordered list marker: dashes, consistently.
+    "MD004": { "style": "dash" },
+
+    // Fenced code blocks must declare a language so highlighting works and
+    // the reader knows whether a block is shell, sql, or plain diagram text.
+    "MD040": true,
+
+    // Emphasis used as a heading — the product spec legitimately uses bold
+    // labels inside sections.
+    "MD036": false,
+
+    // Table pipe padding. We write delimiter rows compactly (`|---|---|`),
+    // which GitHub renders identically to the padded form. Enforcing padding
+    // would rewrite every table in the repo for no rendering difference.
+    // MD056 (column count) stays ON — that one catches real breakage from an
+    // unescaped pipe inside a cell.
+    "MD060": false
+  },
+  "globs": ["**/*.md"],
+  "ignores": [
+    "node_modules/**",
+    ".next/**",
+    "coverage/**",
+    "playwright-report/**",
+    "CHANGELOG.md"
+  ]
+}
