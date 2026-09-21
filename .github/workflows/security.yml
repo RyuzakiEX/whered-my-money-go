@@ -60,7 +60,7 @@ jobs:
       # Pass 1 — report everything, never fail. Feeds the Security tab so
       # findings accumulate as history even on main.
       - name: Scan (report)
-        uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4 # v0.32.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: fs
           scanners: vuln,secret,misconfig
@@ -72,7 +72,7 @@ jobs:
 
       - name: Upload SARIF
         if: always()
-        uses: github/codeql-action/upload-sarif@4e94bd11f71e507f7f87df81788dff88d1dacbfb # v3.29.0
+        uses: github/codeql-action/upload-sarif@1c5b675653bb5c22dbe9b12b556ec555138e09fd # v3.29.0
         with:
           sarif_file: trivy.sarif
           category: trivy
@@ -82,7 +82,7 @@ jobs:
       # red, while a PR that introduces one is blocked.
       - name: Gate on HIGH/CRITICAL (pull requests)
         if: github.event_name == 'pull_request'
-        uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4 # v0.32.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: fs
           scanners: vuln,misconfig
