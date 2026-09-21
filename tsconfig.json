@@ -1,0 +1,70 @@
+{
+  "compilerOptions": {
+    // --- Strictness -------------------------------------------------------
+    // The four flags below are required by M0-B01. They exist because this
+    // application handles money: a type system that quietly permits undefined
+    // is a type system that permits a wrong balance.
+    "strict": true,
+    // Indexing an array returns `T | undefined`. Without this, `items[0].amount`
+    // typechecks on an empty array and crashes at runtime.
+    "noUncheckedIndexedAccess": true,
+    // An override must say so. Catches a renamed base method silently
+    // becoming a new one.
+    "noImplicitOverride": true,
+    // `{ a?: number }` and `{ a: number | undefined }` stop being
+    // interchangeable — an optional field cannot be explicitly set undefined.
+    "exactOptionalPropertyTypes": true,
+    // Additional strictness beyond the required four.
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    // --- Modules ----------------------------------------------------------
+    "moduleResolution": "bundler",
+    "module": "esnext",
+    "target": "ES2022",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "allowJs": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": false,
+    // --- Emit -------------------------------------------------------------
+    // Next handles the build; tsc is only ever run with --noEmit.
+    "noEmit": true,
+    "incremental": true,
+    "skipLibCheck": true,
+    // --- JSX --------------------------------------------------------------
+    "jsx": "react-jsx",
+    // --- Paths ------------------------------------------------------------
+    // `@/*` maps to the repository root, not to a src/ directory — there is
+    // no src/. See docs/architecture/source-structure.md.
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    },
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ]
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    ".next",
+    "out",
+    "coverage",
+    "playwright-report"
+  ]
+}
