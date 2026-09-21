@@ -1,0 +1,115 @@
+# Playwright end-to-end tests.
+#
+# Separate from ci.yml because it is slow (~10-20 min), needs a browser and a
+# running database, and should not be queued by a documentation change.
+#
+# The paths-ignore filter is safe HERE because `e2e` is not a required status
+# check while the suite is still thin — see workflow/02-branching.md. Do not
+# copy this filter into ci.yml or security.yml: a path-filtered required check
+# never runs on unrelated PRs and blocks the merge button forever.
+name: e2e
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "workflow/**"
+      - "tasks/**"
+      - "LICENSE"
+      - ".gitleaks.toml"
+      - ".trivyignore"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  playwright:
+    name: playwright (chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - id: detect
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f playwright.config.ts ] || [ -f playwright.config.js ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "No Playwright config yet — E2E activated by M0-B09."
+          fi
+          if [ -f supabase/config.toml ]; then
+            echo "supabase=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "supabase=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: ./.github/actions/setup-node-project
+        if: steps.detect.outputs.run == 'true'
+
+      # Chromium only. A cross-browser matrix triples the runtime for a suite
+      # whose job is to catch broken flows, not rendering differences.
+      - name: Install Playwright browsers
+        if: steps.detect.outputs.run == 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Start local Supabase
+        if: steps.detect.outputs.run == 'true' && steps.detect.outputs.supabase == 'true'
+        run: |
+          supabase start
+          supabase db reset
+
+      - name: Run E2E tests
+        if: steps.detect.outputs.run == 'true'
+        run: npm run test:e2e
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+          NEXT_PUBLIC_SITE_URL: http://localhost:3000
+          CI: "true"
+
+      # The trace and screenshots are the only way to debug a CI-only failure.
+      - name: Upload Playwright report
+        if: failure() && steps.detect.outputs.run == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Stop local Supabase
+        if: always() && steps.detect.outputs.supabase == 'true'
+        run: supabase stop --no-backup || true
+
+  e2e-status:
+    name: e2e
+    needs: [playwright]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check results
+        shell: bash
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          failed=$(printf '%s' "$NEEDS" | grep -o '"result": *"failure"' | wc -l)
+          cancelled=$(printf '%s' "$NEEDS" | grep -o '"result": *"cancelled"' | wc -l)
+          if [ "$failed" -gt 0 ] || [ "$cancelled" -gt 0 ]; then
+            echo "::error::E2E tests failed. Download the playwright-report artifact."
+            exit 1
+          fi
+          echo "E2E passed or was skipped."

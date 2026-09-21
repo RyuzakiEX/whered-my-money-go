@@ -1,0 +1,219 @@
+# Schema integrity gate.
+#
+# `supabase/migrations/*.sql` is the single source of truth for the database
+# schema (ADR-0002). This workflow is what makes that claim true rather than
+# aspirational. Four checks share one expensive `supabase start`:
+#
+#   1. Migrations replay cleanly from an empty database.
+#   2. No drift between the migrations and the schema they produce.
+#   3. The committed generated types match the actual schema.
+#   4. RLS is enabled on every public table, and the pgTAP isolation tests pass.
+#
+# Uses a throwaway local Postgres, so it needs ZERO secrets and runs on fork
+# PRs. See workflow/09-database-changes.md.
+name: schema-drift
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: schema-drift-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  drift:
+    name: schema drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - id: detect
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f supabase/config.toml ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "No supabase/config.toml yet — activated by M0-B05."
+          fi
+
+      # TODO(#M0-B08): replace with the real commit SHA before this job first
+      # runs. Resolve with:
+      #   gh api repos/supabase/setup-cli/commits/v1 --jq .sha
+      # Pinning policy and rationale: docs/security/ci-security-gates.md
+      - uses: supabase/setup-cli@v1 # PIN-PENDING
+        if: steps.detect.outputs.run == 'true'
+        with:
+          version: latest
+
+      - uses: ./.github/actions/setup-node-project
+        if: steps.detect.outputs.run == 'true'
+        with:
+          install: "false"
+
+      - name: Start local Supabase
+        if: steps.detect.outputs.run == 'true'
+        run: supabase start
+
+      # --- Gate 1: migrations replay from empty ------------------------------
+      # `db reset` drops and rebuilds from migrations only. A migration that
+      # depends on hand-applied state fails here, which is the point.
+      - name: Migrations replay from an empty database
+        if: steps.detect.outputs.run == 'true'
+        run: supabase db reset
+
+      # --- Gate 2: no schema drift -----------------------------------------
+      - name: No uncommitted schema drift
+        if: steps.detect.outputs.run == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase db diff --schema public > drift.sql 2>/dev/null || true
+          if [ -s drift.sql ]; then
+            echo "::error::Schema drift detected. The live schema does not match the migrations."
+            {
+              echo "### Schema drift detected"
+              echo ""
+              echo "Run \`supabase db diff -f <name>\` and commit the migration."
+              echo ""
+              echo '```sql'
+              cat drift.sql
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "No drift."
+
+      # --- Gate 3: generated types are current -----------------------------
+      # A stale database.types.ts means TypeScript is validating against a
+      # schema that no longer exists — type safety that silently lies.
+      - name: Generated types match the schema
+        if: steps.detect.outputs.run == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f types/database.types.ts ]; then
+            echo "No types/database.types.ts yet — skipping (M0-B07 wires this up)."
+            exit 0
+          fi
+          supabase gen types typescript --local > /tmp/database.types.ts
+          if ! diff -u types/database.types.ts /tmp/database.types.ts > /tmp/types.diff; then
+            echo "::error::Generated types are stale. Run 'npm run db:types' and commit."
+            {
+              echo "### Stale generated types"
+              echo ""
+              echo '```diff'
+              head -n 100 /tmp/types.diff
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "Types current."
+
+      # --- Gate 4a: RLS enabled everywhere ----------------------------------
+      # The cheapest possible protection against the worst possible bug: a new
+      # table shipped without Row Level Security is world-readable to every
+      # authenticated user. This check is why that cannot happen silently.
+      - name: RLS enabled on every public table
+        if: steps.detect.outputs.run == 'true'
+        shell: bash
+        env:
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          unprotected=$(psql -h 127.0.0.1 -p 54322 -U postgres -d postgres -At -c "
+            select c.relname
+            from pg_class c
+            join pg_namespace n on n.oid = c.relnamespace
+            where n.nspname = 'public'
+              and c.relkind = 'r'
+              and c.relrowsecurity = false
+              and c.relname not in ('schema_migrations', 'supabase_migrations')
+            order by c.relname;
+          ")
+          if [ -n "$unprotected" ]; then
+            echo "::error::These public tables have RLS DISABLED:"
+            echo "$unprotected"
+            {
+              echo "### Tables without Row Level Security"
+              echo ""
+              echo '```text'
+              echo "$unprotected"
+              echo '```'
+              echo ""
+              echo "Every user table must enable RLS and define policies."
+              echo "See docs/architecture/rls-policies.md."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "All public tables have RLS enabled."
+
+      # --- Gate 4b: RLS tables actually have policies ----------------------
+      # RLS enabled with zero policies is default-deny, which fails closed and
+      # is therefore safe — but it is almost always a mistake, so flag it.
+      - name: Every RLS table has at least one policy
+        if: steps.detect.outputs.run == 'true'
+        shell: bash
+        env:
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          policyless=$(psql -h 127.0.0.1 -p 54322 -U postgres -d postgres -At -c "
+            select c.relname
+            from pg_class c
+            join pg_namespace n on n.oid = c.relnamespace
+            where n.nspname = 'public'
+              and c.relkind = 'r'
+              and c.relrowsecurity = true
+              and not exists (select 1 from pg_policy p where p.polrelid = c.oid)
+            order by c.relname;
+          ")
+          if [ -n "$policyless" ]; then
+            echo "::warning::RLS enabled but NO policies defined (table is fully inaccessible):"
+            echo "$policyless"
+          fi
+
+      # --- Gate 4c: pgTAP isolation tests ----------------------------------
+      - name: pgTAP RLS isolation tests
+        if: steps.detect.outputs.run == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -d supabase/tests ] || [ -z "$(find supabase/tests -name '*.sql' -print 2>/dev/null | head -n1)" ]; then
+            echo "No pgTAP tests yet — the harness lands in M1-B03."
+            exit 0
+          fi
+          supabase test db
+
+      - name: Stop local Supabase
+        if: always() && steps.detect.outputs.run == 'true'
+        run: supabase stop --no-backup || true
+
+  schema-status:
+    name: schema
+    needs: [drift]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check results
+        shell: bash
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          failed=$(printf '%s' "$NEEDS" | grep -o '"result": *"failure"' | wc -l)
+          cancelled=$(printf '%s' "$NEEDS" | grep -o '"result": *"cancelled"' | wc -l)
+          if [ "$failed" -gt 0 ] || [ "$cancelled" -gt 0 ]; then
+            echo "::error::Schema gate failed. See workflow/09-database-changes.md."
+            exit 1
+          fi
+          echo "Schema gates passed or were skipped."

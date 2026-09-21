@@ -1,0 +1,153 @@
+# Documentation gate: markdown lint, link check, and structural consistency.
+#
+# This is the one workflow that does real work today. It is what makes CI on
+# this repo genuinely green AND genuinely meaningful rather than vacuously
+# green. The structure checks exist because a docs set this size rots silently
+# — an ADR that never reaches the index, a backlog file nobody links.
+name: docs
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  markdown:
+    name: markdown lint + links
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Lint markdown
+        uses: DavidAnson/markdownlint-cli2-action@992badcdf24e3b8eb7e87ff9287fe931bcb00c6e # v20.0.0
+        with:
+          globs: |
+            **/*.md
+            !node_modules
+
+      # --offline checks relative links only. External links are deliberately
+      # not checked: a third-party site going down should never turn this repo
+      # red. Enable network checks later on the scheduled run only.
+      - name: Check relative links
+        uses: lycheeverse/lychee-action@82202e5e9c2f4ef1a55a3d02563e1cb6041e5332 # v2.4.1
+        with:
+          args: >-
+            --offline
+            --no-progress
+            --include-fragments
+            --exclude-path node_modules
+            .
+          fail: true
+
+  structure:
+    name: docs structure checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Every ADR appears in the ADR index
+        shell: bash
+        run: |
+          set -euo pipefail
+          fail=0
+          [ -d docs/adr ] || { echo "No docs/adr yet — skipping."; exit 0; }
+          for adr in docs/adr/[0-9]*.md; do
+            [ -e "$adr" ] || continue
+            base=$(basename "$adr")
+            if ! grep -qF "$base" docs/adr/README.md; then
+              echo "::error file=docs/adr/README.md::$base is not listed in the ADR index"
+              fail=1
+            fi
+          done
+          exit $fail
+
+      - name: Every backlog file is listed in tasks/milestones.md
+        shell: bash
+        run: |
+          set -euo pipefail
+          fail=0
+          [ -d tasks/backlog ] || { echo "No tasks/backlog yet — skipping."; exit 0; }
+          for f in tasks/backlog/*.md; do
+            [ -e "$f" ] || continue
+            base=$(basename "$f")
+            if ! grep -qF "$base" tasks/milestones.md; then
+              echo "::error file=tasks/milestones.md::$base is not listed in the milestone index"
+              fail=1
+            fi
+          done
+          exit $fail
+
+      - name: Task IDs are unique across backlog files
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -d tasks/backlog ] || { echo "No tasks/backlog yet — skipping."; exit 0; }
+          # IDs look like M7-B02 / M7-F01. A duplicate means two tasks share an
+          # identifier, and cross-references silently point at the wrong one.
+          dupes=$(grep -ohE '\bM[0-9]+-[BFSD][0-9]{2}\b' tasks/backlog/*.md \
+                    | sort | uniq -d || true)
+          if [ -n "$dupes" ]; then
+            echo "::error::Duplicate task IDs found:"
+            echo "$dupes"
+            exit 1
+          fi
+          echo "All task IDs unique."
+
+      - name: Every doc listed in docs/README.md exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          fail=0
+          [ -f docs/README.md ] || { echo "No docs/README.md yet — skipping."; exit 0; }
+          # Extract relative markdown link targets and confirm each resolves.
+          grep -ohE '\]\(([a-zA-Z0-9_./-]+\.md)' docs/README.md \
+            | sed -E 's/^\]\(//' | sort -u | while read -r target; do
+              if [ ! -f "docs/$target" ] && [ ! -f "$target" ]; then
+                echo "::error file=docs/README.md::linked doc does not exist: $target"
+                fail=1
+              fi
+            done
+          exit $fail
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Docs structure"
+            echo ""
+            echo "- ADR index consistency"
+            echo "- Backlog files indexed in \`tasks/milestones.md\`"
+            echo "- Task ID uniqueness"
+            echo "- \`docs/README.md\` link targets exist"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  docs-status:
+    name: docs
+    needs: [markdown, structure]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check results
+        shell: bash
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          failed=$(printf '%s' "$NEEDS" | grep -o '"result": *"failure"' | wc -l)
+          cancelled=$(printf '%s' "$NEEDS" | grep -o '"result": *"cancelled"' | wc -l)
+          if [ "$failed" -gt 0 ] || [ "$cancelled" -gt 0 ]; then
+            echo "::error::A docs gate failed."
+            exit 1
+          fi
+          echo "Docs gates passed."
