@@ -1,1 +1,0 @@
-           grep -o '"result": *"failure"' | grep -o '"result": *"failure"' | wc -l)
