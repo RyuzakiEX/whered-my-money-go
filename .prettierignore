@@ -1,0 +1,35 @@
+# Build output
+.next/
+out/
+coverage/
+playwright-report/
+test-results/
+node_modules/
+
+# Generated — never hand-edited, so never reformatted.
+types/database.types.ts
+next-env.d.ts
+package-lock.json
+
+# Markdown is governed by markdownlint (.markdownlint-cli2.jsonc), which is
+# already enforced by the docs CI gate. Running Prettier over it as well means
+# two tools with opinions about the same files, and they disagree about table
+# alignment and list indentation.
+*.md
+
+# Deliberate lint violations — formatting them is beside the point.
+tests/fixtures/lint/
+
+# CI workflows. These are carefully commented and their layout is load-bearing
+# for readability; Prettier reflows them and strips the alignment. They are
+# already validated by the workflows themselves, and a formatter has no opinion
+# worth having about a `run: |` block.
+.github/
+
+# Next rewrites tsconfig.json on every build (adding its types paths), so
+# formatting it means fighting the framework on every run.
+tsconfig.json
+
+# jsonc with comments — Prettier's json parser mangles the trailing-comment
+# style used to explain each rule.
+.markdownlint-cli2.jsonc
