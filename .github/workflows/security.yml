@@ -67,7 +67,7 @@ jobs:
       # comes from the PR-gating pass below, which is not tolerant.
       - name: Scan (report)
         continue-on-error: true
-        uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4 # v0.32.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: fs
           scanners: vuln,secret,misconfig
@@ -108,7 +108,7 @@ jobs:
       # red, while a PR that introduces one is blocked.
       - name: Gate on HIGH/CRITICAL (pull requests)
         if: github.event_name == 'pull_request'
-        uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4 # v0.32.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: fs
           scanners: vuln,misconfig

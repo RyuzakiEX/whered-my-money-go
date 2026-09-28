@@ -175,11 +175,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: ./.github/actions/setup-node-project
 
-      # TODO(#M0-B08): replace with the real commit SHA before this job first
-      # runs. Resolve with:
-      #   gh api repos/supabase/setup-cli/commits/v1 --jq .sha
-      # Pinning policy and rationale: docs/security/ci-security-gates.md
-      - uses: supabase/setup-cli@v1 # PIN-PENDING
+      - uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb # v1
         with:
           version: latest
 

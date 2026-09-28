@@ -94,19 +94,11 @@ than becoming a chore people abandon.
 `actions/*` (first-party GitHub) are pinned too — consistency means the rule has
 no exceptions to remember, and CodeQL's `actions` analysis flags unpinned uses.
 
-> [!WARNING]
-> **Two pins are outstanding.** `supabase/setup-cli` in `ci.yml` and
-> `schema-drift.yml` is still tag-pinned and marked `# PIN-PENDING`. Both jobs
-> are currently skipped (no `supabase/config.toml` yet), so nothing unpinned
-> executes — but they must be resolved before those jobs first run, which is
-> part of [M0-B08](../../tasks/backlog/m0-foundation.md):
->
-> ```bash
-> gh api repos/supabase/setup-cli/commits/v1 --jq .sha
-> ```
->
-> The local check below greps for tag-pinned actions; until these are fixed it
-> reports them, which is the intended behaviour rather than a false positive.
+> [!NOTE]
+> **Every action is SHA-pinned.** The local check below greps for tag-pinned
+> actions and should print nothing. Two `supabase/setup-cli` pins were
+> outstanding while its jobs were skipping; both were resolved once `gh` was
+> available to look up the real SHA.
 
 ## Reproducing a gate locally
 

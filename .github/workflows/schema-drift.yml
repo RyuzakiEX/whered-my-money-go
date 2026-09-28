@@ -45,11 +45,7 @@ jobs:
             echo "No supabase/config.toml yet — activated by M0-B05."
           fi
 
-      # TODO(#M0-B08): replace with the real commit SHA before this job first
-      # runs. Resolve with:
-      #   gh api repos/supabase/setup-cli/commits/v1 --jq .sha
-      # Pinning policy and rationale: docs/security/ci-security-gates.md
-      - uses: supabase/setup-cli@v1 # PIN-PENDING
+      - uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb # v1
         if: steps.detect.outputs.run == 'true'
         with:
           version: latest
