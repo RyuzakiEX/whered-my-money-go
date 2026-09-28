@@ -210,7 +210,7 @@ Rules:
 - **Parsing is the inverse and is locale-aware** — `parseMoneyToMinor` handles
   thousands separators, a `₱` prefix, and comma-vs-period decimals. Never
   `parseFloat`. See
-  [../domain/money-and-rounding.md](../domain/money-and-rounding.md#parsing).
+  [../domain/money-and-rounding.md](../domain/money-and-rounding.md#parsing-at-the-boundary).
 - **Large figures may abbreviate in chart axes** (`₱35k`) but **never** in a
   balance, total, or Safe to Spend figure. Precision matters where the user is
   making a decision.

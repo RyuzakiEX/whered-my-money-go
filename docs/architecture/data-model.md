@@ -583,7 +583,7 @@ application logs are in [observability.md](observability.md#audit-log).
 | `action` | `text` | no | — | `<entity>.<verb>` — `account.created`, `goal.deleted`, `auth.password_reset_requested`. Text rather than an enum: audit vocabulary grows continuously, and an `alter type` per new event is friction that discourages logging |
 | `entity_type` | `text` | yes | `null` | `account`, `budget`, `goal`, `transaction` |
 | `entity_id` | `uuid` | yes | `null` | Not a FK — the referenced row may be gone; that is often the event being recorded |
-| `metadata` | `jsonb` | no | `'{}'` | Non-sensitive context only. **No amounts, no descriptions, no PII.** See [observability.md](observability.md#must-never-be-logged) |
+| `metadata` | `jsonb` | no | `'{}'` | Non-sensitive context only. **No amounts, no descriptions, no PII.** See [observability.md](observability.md#never-log-this) |
 | `ip_hash` | `text` | yes | `null` | Salted hash, never a raw IP. Enough to spot "logins from 40 addresses", not enough to be a location record |
 | `occurred_at` | `timestamptz` | no | `now()` | No `updated_at` — an append-only log has no update path, and RLS grants no `update` or `delete` to anyone |
 

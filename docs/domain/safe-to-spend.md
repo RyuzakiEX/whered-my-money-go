@@ -66,7 +66,8 @@ Every term is a **non-negative** magnitude except `currentBalanceMinor`, which
 may be negative (an overdrawn account, a net-negative position). The signs live
 in the formula, not in the values — the same rule the schema follows, where
 `amount_minor` is always positive and `transaction_type` carries the direction.
-See [money-and-rounding.md](money-and-rounding.md#sign-conventions).
+See [money-and-rounding.md](money-and-rounding.md#the-representation) and
+[data-model.md](../architecture/data-model.md).
 
 > [!IMPORTANT]
 > There is no rounding anywhere in this computation. Every input is already an
