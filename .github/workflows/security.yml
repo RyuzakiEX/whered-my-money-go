@@ -59,7 +59,14 @@ jobs:
 
       # Pass 1 — report everything, never fail. Feeds the Security tab so
       # findings accumulate as history even on main.
+      #
+      # continue-on-error because this pass produces a REPORT, not a verdict:
+      # the action's own installer step downloads the Trivy binary from GitHub
+      # releases and has been observed to fail transiently, which would red the
+      # whole security gate over an artifact nobody is blocking on. The verdict
+      # comes from the PR-gating pass below, which is not tolerant.
       - name: Scan (report)
+        continue-on-error: true
         uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4 # v0.32.0
         with:
           scan-type: fs
@@ -199,8 +206,11 @@ jobs:
           set -euo pipefail
           echo "$NEEDS"
 
-          failed=$(printf '%s' "$NEEDS" | grep -o '"result": *"failure"' | wc -l)
-          cancelled=$(printf '%s' "$NEEDS" | grep -o '"result": *"cancelled"' | wc -l)
+          # grep exits 1 when it finds nothing, which under `set -e` kills the
+          # script before the comparison — so these gates failed precisely when
+          # NOTHING had failed. `|| true` is load-bearing.
+          failed=$(printf '%s' "$NEEDS" | grep -c '"result": *"failure"' || true)
+          cancelled=$(printf '%s' "$NEEDS" | grep -c '"result": *"cancelled"' || true)
 
           {
             echo "### Security aggregate gate"

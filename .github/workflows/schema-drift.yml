@@ -210,8 +210,11 @@ jobs:
           NEEDS: ${{ toJSON(needs) }}
         run: |
           set -euo pipefail
-          failed=$(printf '%s' "$NEEDS" | grep -o '"result": *"failure"' | wc -l)
-          cancelled=$(printf '%s' "$NEEDS" | grep -o '"result": *"cancelled"' | wc -l)
+          # grep exits 1 when it finds nothing, which under `set -e` kills the
+          # script before the comparison — so these gates failed precisely when
+          # NOTHING had failed. `|| true` is load-bearing.
+          failed=$(printf '%s' "$NEEDS" | grep -c '"result": *"failure"' || true)
+          cancelled=$(printf '%s' "$NEEDS" | grep -c '"result": *"cancelled"' || true)
           if [ "$failed" -gt 0 ] || [ "$cancelled" -gt 0 ]; then
             echo "::error::Schema gate failed. See workflow/09-database-changes.md."
             exit 1
