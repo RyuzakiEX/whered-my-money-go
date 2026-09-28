@@ -18,7 +18,7 @@ The forces:
 
 - **Unit tests must be fast enough to run on every save.** They are the primary
   feedback loop for `lib/core`, and a slow suite stops being run.
-- **The project is TypeScript and ESM throughout.** Next.js 15, native ESM.
+- **The project is TypeScript and ESM throughout.** Next.js 16, native ESM.
 - **Property-based testing is required.** Each domain doc lists invariants to
   check over generated inputs.
 - **One developer.** Configuration time is product time.
@@ -72,7 +72,7 @@ in CI, so the same command fails identically on a laptop and in the pipeline.
 
 **What it was.** The conventional choice. Enormous ecosystem, universally known.
 
-**Why rejected.** Jest's ESM support is still awkward, and Next.js 15 with
+**Why rejected.** Jest's ESM support is still awkward, and Next.js 16 with
 native ESM is exactly where that hurts: `transformIgnorePatterns`,
 `extensionsToTreatAsEsm`, and `moduleNameMapper` become ongoing maintenance
 rather than one-time setup. Jest is also measurably slower on the watch loop

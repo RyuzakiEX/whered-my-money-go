@@ -92,16 +92,27 @@ jobs:
         run: |
           set -euo pipefail
           [ -d tasks/backlog ] || { echo "No tasks/backlog yet — skipping."; exit 0; }
-          # IDs look like M7-B02 / M7-F01. A duplicate means two tasks share an
-          # identifier, and cross-references silently point at the wrong one.
-          dupes=$(grep -ohE '\bM[0-9]+-[BFSD][0-9]{2}\b' tasks/backlog/*.md \
-                    | sort | uniq -d || true)
+          # Match only task-ROW DEFINITIONS, not every mention.
+          #
+          # An ID legitimately appears several times in one file: the progress
+          # table, its own task row, and cross-references from other tasks. A
+          # naive grep for the ID counts all of those and reports every task as
+          # a duplicate — which is exactly what the first version of this check
+          # did.
+          #
+          # A definition is a table row whose first two cells are the ID and a
+          # stream name, so that is what we count.
+          dupes=$(grep -ohE '^\| M[0-9]+-[BFSD][0-9]{2} \| (backend|frontend|shared|devops) \|' \
+                    tasks/backlog/*.md \
+                    | awk '{print $2}' | sort | uniq -d || true)
           if [ -n "$dupes" ]; then
-            echo "::error::Duplicate task IDs found:"
+            echo "::error::Duplicate task ID definitions found:"
             echo "$dupes"
             exit 1
           fi
-          echo "All task IDs unique."
+          count=$(grep -ohE '^\| M[0-9]+-[BFSD][0-9]{2} \| (backend|frontend|shared|devops) \|' \
+                    tasks/backlog/*.md | wc -l)
+          echo "All $count task ID definitions are unique."
 
       - name: Every doc listed in docs/README.md exists
         shell: bash
@@ -144,8 +155,11 @@ jobs:
           NEEDS: ${{ toJSON(needs) }}
         run: |
           set -euo pipefail
-          failed=$(printf '%s' "$NEEDS" | grep -o '"result": *"failure"' | wc -l)
-          cancelled=$(printf '%s' "$NEEDS" | grep -o '"result": *"cancelled"' | wc -l)
+          # grep exits 1 when it finds nothing, which under `set -e` kills the
+          # script before the comparison — so these gates failed precisely when
+          # NOTHING had failed. `|| true` is load-bearing.
+          failed=$(printf '%s' "$NEEDS" | grep -c '"result": *"failure"' || true)
+          cancelled=$(printf '%s' "$NEEDS" | grep -c '"result": *"cancelled"' || true)
           if [ "$failed" -gt 0 ] || [ "$cancelled" -gt 0 ]; then
             echo "::error::A docs gate failed."
             exit 1

@@ -103,7 +103,7 @@ Refs #91
 ```
 
 The `!` and the footer are both conventional. See
-[09-database-changes.md](09-database-changes.md#expandcontract) — a breaking
+[09-database-changes.md](09-database-changes.md#expand--contract) — a breaking
 migration should be rare, and only ever the *contract* step of a sequence whose
 earlier steps have already shipped.
 

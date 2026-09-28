@@ -128,7 +128,7 @@ every PR that changes no code — every docs PR, which is currently all of them 
 would skip `unit` and wait indefinitely for a check that will never arrive.
 Requiring the aggregate instead means the required check always runs and always
 reports. Full explanation in
-[08-ci-gates.md](08-ci-gates.md#why-is-ci-green-on-an-empty-repo).
+[08-ci-gates.md](08-ci-gates.md#why-ci-is-green-on-an-empty-repo).
 
 ### Why Code Owners review is off
 
@@ -141,7 +141,7 @@ where nothing can merge.
 
 So: `CODEOWNERS` for **notification**, not **enforcement**, while solo. The
 substitute is the self-review discipline in
-[04-pull-requests.md](04-pull-requests.md#solo-dev-mode). Flip this setting on
+[04-pull-requests.md](04-pull-requests.md#solo-dev-merging). Flip this setting on
 the day a second contributor has push access — it is a checkbox, and the
 `CODEOWNERS` file it depends on is already correct.
 
