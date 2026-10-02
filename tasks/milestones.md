@@ -28,6 +28,7 @@ cannot be demonstrated, it was scoped wrong.
 | **M8** | [Money Timeline ⭐](backlog/m8-money-timeline.md) | `░░░░░░░░░░` | 0/13 | 0% | not started |
 | **M9** | [MVP Hardening & Launch](backlog/m9-mvp-hardening-and-launch.md) | `░░░░░░░░░░` | 0/10 | 0% | not started |
 | | **MVP total** | `░░░░░░░░░░` | **2/116** | **2%** | |
+
 ## Contents
 
 - [Master table](#master-table)

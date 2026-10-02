@@ -63,6 +63,11 @@ block = [
     *rows,
     f'| | **MVP total** | `{overall_bar}` | **{total_done}/{total_all}** |'
     f' **{overall_pct}%** | |',
+    # Two entries, so the join leaves a BLANK LINE after the table rather than
+    # just a newline. markdownlint's MD058 (blanks-around-tables) and MD022
+    # (blanks-around-headings) both fail without it, and the heading that
+    # follows this section would be flagged.
+    '',
     '',
 ]
 new_section = '\n'.join(block)
