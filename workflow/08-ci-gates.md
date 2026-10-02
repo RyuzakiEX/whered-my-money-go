@@ -32,7 +32,7 @@ They never need changing as the project grows — that is the whole design, and
 | Job | Blocks? | Checks | Reproduce locally |
 |---|---|---|---|
 | **preflight (detect project)** | No — always passes | Detects `package.json`, lockfile, tests, `supabase/config.toml`, migrations. Writes a summary table. | — |
-| **lint** | Yes | ESLint (incl. the [import boundaries](../docs/architecture/source-structure.md#import-rules)) + Prettier | `npm run lint && npm run format:check` |
+| **lint** | Yes | ESLint, the [import-boundary assertion](../docs/architecture/source-structure.md#import-rules), and Prettier | `npm run lint && npm run lint:boundaries && npm run format:check` |
 | **typecheck** | Yes | `tsc --noEmit`, strict | `npm run typecheck` |
 | **unit tests** | Yes | Vitest + coverage thresholds | `npm run test -- --coverage` |
 | **integration tests** | Yes | Vitest against a local Supabase | `supabase start && npm run test:integration` |

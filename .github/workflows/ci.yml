@@ -127,6 +127,15 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: ./.github/actions/setup-node-project
       - run: npm run lint
+
+      # Asserts the deliberate-violation fixtures STILL fail, each on its own
+      # specific rule. A boundary rule that silently stops working — a typo in
+      # a glob, a dropped config block — would otherwise go unnoticed until
+      # lib/core had quietly imported React. Runs only when the script exists.
+      - name: Assert import boundaries are enforced
+        if: hashFiles('scripts/assert-lint-boundaries.mjs') != ''
+        run: npm run lint:boundaries
+
       - name: Check formatting
         run: npm run format:check
 
