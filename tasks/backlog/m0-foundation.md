@@ -29,8 +29,8 @@ exits 0 unconditionally is worse than nothing, because it buys false confidence.
 
 | Done | ID | Title |
 |---|---|---|
-| [ ] | M0-B01 | `[M0][BE] Scaffold Next.js 16 App Router project with strict TypeScript` |
-| [ ] | M0-B02 | `[M0][SH] Configure ESLint, Prettier, and import-boundary rules` |
+| [x] | M0-B01 | `[M0][BE] Scaffold Next.js 16 App Router project with strict TypeScript` |
+| [x] | M0-B02 | `[M0][SH] Configure ESLint, Prettier, and import-boundary rules` |
 | [ ] | M0-B03 | `[M0][SH] Define npm script surface` |
 | [ ] | M0-B04 | `[M0][BE] Set up Vitest with unit and integration projects and coverage thresholds` |
 | [ ] | M0-F01 | `[M0][FE] Install shadcn/ui with design tokens, dark mode, and a kitchen-sink page` |

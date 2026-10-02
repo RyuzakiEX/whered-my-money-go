@@ -10,6 +10,24 @@ cannot be demonstrated, it was scoped wrong.
 | **Success authority** | [../docs/product/product-spec.md](../docs/product/product-spec.md) §31 |
 | **Tracking** | GitHub Milestones (not labels) — see [labels.md](labels.md#milestones-are-not-labels) |
 
+## Progress
+
+> [!NOTE]
+> Generated from the checkbox tables in each backlog file — tick a task there and regenerate, so this summary cannot drift from its source.
+
+| ID | Milestone | | Tasks | | Status |
+|---|---|---|---|---|---|
+| **M0** | [Foundation & Toolchain](backlog/m0-foundation.md) | `█░░░░░░░░░` | 2/14 | 14% | in progress |
+| **M1** | [Auth & Profile](backlog/m1-auth-and-profile.md) | `░░░░░░░░░░` | 0/13 | 0% | not started |
+| **M2** | [Accounts](backlog/m2-accounts.md) | `░░░░░░░░░░` | 0/11 | 0% | not started |
+| **M3** | [Transactions & Categories](backlog/m3-transactions-and-categories.md) | `░░░░░░░░░░` | 0/15 | 0% | not started |
+| **M4** | [Dashboard Core](backlog/m4-dashboard-core.md) | `░░░░░░░░░░` | 0/10 | 0% | not started |
+| **M5** | [Budgets](backlog/m5-budgets.md) | `░░░░░░░░░░` | 0/10 | 0% | not started |
+| **M6** | [Savings Goals](backlog/m6-goals.md) | `░░░░░░░░░░` | 0/10 | 0% | not started |
+| **M7** | [Safe to Spend ⭐](backlog/m7-safe-to-spend.md) | `░░░░░░░░░░` | 0/10 | 0% | not started |
+| **M8** | [Money Timeline ⭐](backlog/m8-money-timeline.md) | `░░░░░░░░░░` | 0/13 | 0% | not started |
+| **M9** | [MVP Hardening & Launch](backlog/m9-mvp-hardening-and-launch.md) | `░░░░░░░░░░` | 0/10 | 0% | not started |
+| | **MVP total** | `░░░░░░░░░░` | **2/116** | **2%** | |
 ## Contents
 
 - [Master table](#master-table)
