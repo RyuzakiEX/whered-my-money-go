@@ -167,6 +167,45 @@ You can also read the [docs set](../docs/), work the
 the `docs` gate is fully operational, which is the point of having built it
 first.
 
+## Script reference
+
+Every CI gate maps to exactly one script, so a red job reproduces with one
+command. See [08-ci-gates.md](08-ci-gates.md) for the job-to-script mapping.
+
+| Script | Purpose |
+|---|---|
+| `npm run dev` | Next dev server on :3000 |
+| `npm run build` | Production build |
+| `npm run start` | Serve a production build |
+| `npm run lint` | ESLint across the repo |
+| `npm run lint:fix` | ESLint with autofix |
+| `npm run lint:boundaries` | Assert the import matrix still bites — see [source-structure.md](../docs/architecture/source-structure.md#import-rules) |
+| `npm run lint:md` | markdownlint, pinned to CI's version |
+| `npm run format` | Prettier write |
+| `npm run format:check` | Prettier check |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm run test` | Unit suite (Vitest, `tests/unit/**`) |
+| `npm run test:watch` | Unit suite in watch mode |
+| `npm run test:coverage` | Unit suite with coverage thresholds enforced |
+| `npm run test:integration` | Integration suite — **needs `supabase start`** |
+| `npm run test:e2e` | Playwright E2E *[after M0-B09]* |
+| `npm run db:types` | Regenerate `types/database.types.ts` *[after M0-B05]* |
+| `npm run db:reset` | Replay every migration from empty *[after M0-B05]* |
+| `npm run verify` | Everything above except integration and E2E. **Run before pushing.** |
+
+`verify` deliberately omits `test:integration` and `test:e2e`: both need
+services running, and a pre-push check that fails because Docker is stopped is
+a check people route around. CI runs them as their own jobs.
+
+Scripts that depend on a tool you may not have fail with an actionable message
+naming the missing command, not a stack trace:
+
+```text
+$ npm run db:reset
+  Local Supabase is not initialised yet (no supabase/config.toml).
+  This lands in M0-B05 — see tasks/backlog/m0-foundation.md.
+```
+
 ## Local Supabase ports
 
 `supabase start` binds these on `127.0.0.1`. Worth memorising, because a port

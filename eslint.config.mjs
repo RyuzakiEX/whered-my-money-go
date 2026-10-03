@@ -327,6 +327,25 @@ export default tseslint.config(
     rules: { '@typescript-eslint/require-await': 'off' },
   },
 
+  // `dot-notation` wants `process.env.FOO`, but under `noUncheckedIndexedAccess`
+  // TypeScript requires bracket access on an index signature — the two rules
+  // contradict each other. Index-signature access is exempted rather than
+  // disabling the rule, so `obj["knownProp"]` on a real interface is still
+  // flagged.
+  //
+  // Scoped to TypeScript files: the rule needs type information, and applying
+  // it to plain .mjs scripts crashes the linter.
+  {
+    files: ['**/*.{ts,tsx,mts}'],
+    ignores: ['tests/fixtures/lint/**'],
+    rules: {
+      '@typescript-eslint/dot-notation': [
+        'error',
+        { allowIndexSignaturePropertyAccess: true },
+      ],
+    },
+  },
+
   // Must stay last: turns off every rule Prettier owns.
   prettierConfig,
 );
