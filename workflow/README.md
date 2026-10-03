@@ -33,6 +33,7 @@ than quietly implied.
 | [09-database-changes.md](09-database-changes.md) | How do I change the schema without breaking the deployed app? |
 | [10-release.md](10-release.md) | How does this ship, in what order, and how do I roll back? |
 | [11-agent-and-ai-usage.md](11-agent-and-ai-usage.md) | What may AI write here, and what must a human own? |
+| [../CLAUDE.md](../CLAUDE.md) | The three-phase task workflow Claude Code follows, and the non-negotiables. |
 
 ## 60-second version: how I work here
 

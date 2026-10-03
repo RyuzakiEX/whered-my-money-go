@@ -49,6 +49,7 @@ The full product specification is
 | **[workflow/](workflow/)** | How development works here — branching, commits, PRs, CI gates, releases |
 | **[tasks/](tasks/)** | The MVP backlog: 10 milestones, every task with acceptance criteria |
 | **[.github/](.github/)** | Issue and PR templates, six CI workflows |
+| **[CLAUDE.md](CLAUDE.md)** | How Claude Code works here — the task workflow and the non-negotiables |
 
 ## Start here
 

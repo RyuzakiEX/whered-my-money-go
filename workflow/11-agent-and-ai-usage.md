@@ -6,6 +6,12 @@ failure is unrecoverable or invisible.
 This project is AI-assisted and says so. The point of this document is not
 permission — it is drawing the line where review has to be real.
 
+> [!IMPORTANT]
+> The operating contract Claude Code follows lives in
+> [`CLAUDE.md`](../CLAUDE.md): the three-phase task workflow (plan →
+> implement → PR), the non-negotiables, and the honesty requirements.
+> This document covers attribution and what a human must review.
+
 ## Attribution
 
 Add the trailer to AI-assisted commits:
