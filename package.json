@@ -11,14 +11,21 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "lint:boundaries": "node scripts/assert-lint-boundaries.mjs",
+    "lint:md": "markdownlint-cli2 \"**/*.md\"",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "verify": "npm run lint && npm run lint:boundaries && npm run lint:md && npm run format:check && npm run typecheck",
-    "lint:md": "markdownlint-cli2 \"**/*.md\""
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --project unit",
+    "test:watch": "vitest --project unit",
+    "test:coverage": "vitest run --project unit --coverage",
+    "test:integration": "vitest run --project integration",
+    "test:e2e": "node scripts/require-playwright.mjs",
+    "db:types": "node scripts/require-supabase.mjs gen types typescript --local",
+    "db:reset": "node scripts/require-supabase.mjs db reset",
+    "verify": "npm run lint && npm run lint:boundaries && npm run lint:md && npm run format:check && npm run typecheck && npm run test:coverage"
   },
   "dependencies": {
     "next": "16.3.8",
@@ -29,12 +36,14 @@
     "@types/node": "26.6.2",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "@vitest/coverage-v8": "5.0.3",
     "eslint": "9.39.5",
     "eslint-config-next": "16.3.8",
     "eslint-config-prettier": "10.1.8",
     "markdownlint-cli2": "0.18.1",
     "prettier": "3.9.9",
     "typescript": "5.9.3",
-    "typescript-eslint": "8.71.0"
+    "typescript-eslint": "8.71.0",
+    "vitest": "5.0.3"
   }
 }
