@@ -247,15 +247,31 @@ isn't.
 
 ## Troubleshooting
 
-### `supabase start` fails: "Cannot connect to the Docker daemon"
+### `supabase start` fails: Docker unreachable
 
-Docker Desktop isn't running, or is still starting. Launch it, wait until
+The wording varies by CLI version and platform — older CLIs say "Cannot
+connect to the Docker daemon"; CLI 2.120 reports a `DockerLifecycleInspectError`
+ending in "error during connect … connection refused". Either way, Docker
+Desktop isn't running, or is still starting. Launch it, wait until
 `docker info` returns without error, then retry. On Windows also confirm the WSL2
 backend is healthy — Docker Desktop reports this in Settings → Resources.
 Restarting Docker Desktop after a Windows update is a routine step, not a sign of
 a broken setup.
 
-### Port already in use
+### Port already in use — or `HealthCheckTimeoutError`
+
+On Windows a port conflict often does **not** say "port in use". Docker can
+bind alongside another process listening on the same port, and the stack then
+fails its own health checks: `supabase start` exits 1 with a
+`HealthCheckTimeoutError` naming `127.0.0.1:54321`. Treat that as a port
+conflict first:
+
+```powershell
+Get-NetTCPConnection -LocalPort 54321,54322,54323,54324 -State Listen |
+  Select-Object LocalAddress, LocalPort, OwningProcess
+```
+
+Any owner that is not Docker is the culprit. Otherwise:
 
 ```bash
 npx supabase stop            # in the other project's directory
