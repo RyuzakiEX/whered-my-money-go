@@ -69,17 +69,20 @@ a deploy is an approved action rather than a side effect of a merge.
 
 ## Local ports
 
-`supabase start` binds:
+`npx supabase start` binds (set in the committed `supabase/config.toml`; full
+table and key commands in
+[../../workflow/01-local-setup.md](../../workflow/01-local-setup.md#local-supabase-ports)):
 
 | Port | Service |
 |---|---|
 | 54321 | API gateway (PostgREST, Auth, Storage) |
 | 54322 | Postgres |
 | 54323 | Studio (web UI) |
-| 54324 | Inbucket — catches outbound email, so password-reset flows are testable |
+| 54324 | Mailpit — catches outbound email, so password-reset flows are testable |
 
-Inbucket is how you test the spec §4.1 password-reset flow locally: the email
-never leaves your machine, and you read it at `http://localhost:54324`.
+Mailpit (formerly Inbucket in older Supabase CLIs) is how you test the spec
+§4.1 password-reset flow locally: the email never leaves your machine, and you
+read it at `http://127.0.0.1:54324`.
 
 ## Preview deployments
 

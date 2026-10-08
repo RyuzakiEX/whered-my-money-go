@@ -184,9 +184,17 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: ./.github/actions/setup-node-project
 
+      # The CLI version is pinned once, in package.json. Local `npx supabase`
+      # and CI must run the same one — config, diffs, and generated types all
+      # differ between CLI versions.
+      - name: Read pinned Supabase CLI version
+        id: cli
+        shell: bash
+        run: echo "version=$(node -p "require('./package.json').devDependencies.supabase")" >> "$GITHUB_OUTPUT"
+
       - uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb # v1
         with:
-          version: latest
+          version: ${{ steps.cli.outputs.version }}
 
       # A throwaway local Postgres. No secrets needed, so this runs on fork
       # PRs too — see docs/ops/environments.md.
@@ -195,6 +203,20 @@ jobs:
 
       - name: Apply migrations and seed
         run: supabase db reset --no-seed=false
+
+      # The smoke test makes an authenticated round trip, so it needs the local
+      # anon key. It is the CLI's fixed demo key — public, and only valid
+      # against this throwaway stack.
+      - name: Export local anon key
+        shell: bash
+        run: |
+          set -euo pipefail
+          key=$(supabase status -o env | sed -n 's/^ANON_KEY="\(.*\)"$/\1/p')
+          if [ -z "$key" ]; then
+            echo "::error::Could not read ANON_KEY from 'supabase status -o env'."
+            exit 1
+          fi
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$key" >> "$GITHUB_ENV"
 
       - name: Run integration tests
         run: npm run test:integration
