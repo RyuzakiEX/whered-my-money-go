@@ -1,12 +1,12 @@
 # Local Setup
 
-**Install Node LTS, npm, Docker Desktop, the Supabase CLI, and the GitHub CLI;
-then clone, configure `.env.local`, start local Supabase, install, and run.**
+**Install Node LTS, npm, Docker Desktop, and the GitHub CLI; then clone,
+install, start local Supabase, configure `.env.local`, and run.**
 
 > [!IMPORTANT]
-> Most of the run steps below are tagged **[available after M0]**. There is no
-> `package.json`, no `supabase/config.toml`, and no `.nvmrc` in this repository
-> yet — [M0](../tasks/backlog/m0-foundation.md) creates them. The steps are
+> Some steps below are still tagged **[available after M0]** —
+> [M0](../tasks/backlog/m0-foundation.md) is still landing pieces such as
+> `.nvmrc` and the app shell. The steps are
 > documented now because M0's own acceptance criteria are "this document runs
 > top to bottom on a clean machine". Skip to
 > [What you can do today](#what-you-can-do-today) for the currently-runnable
@@ -19,7 +19,7 @@ then clone, configure `.env.local`, start local Supabase, install, and run.**
 | Node.js | Active LTS — pinned in `.nvmrc` **[added in M0]** | CI reads `.nvmrc` via `node-version-file`, so the pin is the single source of truth for local and CI alike. Until it exists, [the composite action](../.github/actions/setup-node-project/action.yml) falls back to Node 22. |
 | npm | Ships with Node | See [Why npm](#why-npm-and-not-pnpm) below. |
 | Docker Desktop | Current stable | Local Supabase is a set of containers — Postgres, Auth (GoTrue), Storage, Realtime, Kong, Studio. No Docker, no local database. |
-| Supabase CLI | Current stable | Owns migrations, type generation, and the local stack. It is the schema source of truth ([ADR-0002](../docs/adr/0002-supabase-cli-migrations-as-schema-source-of-truth.md)). |
+| Supabase CLI | **Pinned in `package.json`** — installed by `npm ci`, run as `npx supabase` | Owns migrations, type generation, and the local stack. It is the schema source of truth ([ADR-0002](../docs/adr/0002-supabase-cli-migrations-as-schema-source-of-truth.md)). Do not install it globally: CI reads the same pin, and config, diffs, and generated types differ between CLI versions. |
 | GitHub CLI (`gh`) | Current stable | Issues, PRs, and re-running CI jobs from the terminal. Optional but the task lifecycle assumes it. |
 
 Install the CLIs however your platform prefers. On Windows:
@@ -27,7 +27,6 @@ Install the CLIs however your platform prefers. On Windows:
 ```powershell
 winget install OpenJS.NodeJS.LTS
 winget install Docker.DockerDesktop
-winget install Supabase.CLI
 winget install GitHub.cli
 ```
 
@@ -37,8 +36,8 @@ Verify:
 node --version        # should match .nvmrc once M0 lands
 npm --version
 docker info           # must succeed, not just `docker --version`
-supabase --version
 gh auth status
+npx supabase --version   # after step 2 — the pinned CLI from package.json
 ```
 
 `docker info` rather than `docker --version` is deliberate: the version string
@@ -73,48 +72,7 @@ gh repo clone jorge/whered-my-money-go
 cd whered-my-money-go
 ```
 
-### 2. Create your environment file
-
-```bash
-cp .env.example .env.local
-```
-
-`.env.example` is the environment contract and it exists today — read the
-comments in it, they explain which values are public by design and which must
-never carry a `NEXT_PUBLIC_` prefix. For local development the Supabase values
-come from step 3's output, and:
-
-```dotenv
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
-```
-
-`.env.local` is gitignored. If you ever find it in a diff, stop and read
-[../SECURITY.md](../SECURITY.md) — the `gitleaks` gate should have caught it,
-and if it didn't, that's a gate bug worth an issue.
-
-### 3. Start local Supabase — **[available after M0]**
-
-```bash
-supabase start
-```
-
-First run pulls several container images and takes a few minutes. It finishes by
-printing your local URL, anon key, and service-role key — copy those three into
-`.env.local`. They are deterministic per project, so you only do this once.
-
-### 4. Apply migrations and seed — **[available after M0]**
-
-```bash
-supabase db reset
-```
-
-This drops the local database, replays every migration in
-`supabase/migrations/` from empty, then runs `supabase/seed.sql`. Use it
-liberally — it is the only way to know your migrations still replay cleanly, and
-it is exactly what the schema-drift gate does in CI. See
-[09-database-changes.md](09-database-changes.md).
-
-### 5. Install dependencies — **[available after M0]**
+### 2. Install dependencies
 
 ```bash
 npm ci
@@ -122,7 +80,63 @@ npm ci
 
 `npm ci`, not `npm install`. `ci` installs exactly the lockfile and errors if
 `package.json` disagrees with it; `install` would quietly resolve a new tree and
-your local environment would stop matching CI's.
+your local environment would stop matching CI's. This also installs the pinned
+Supabase CLI, which the next step needs.
+
+### 3. Start local Supabase
+
+```bash
+npx supabase start
+```
+
+First run pulls several container images and takes a few minutes. Later starts
+take seconds. No edits to `supabase/config.toml` are needed — if you find
+yourself changing it to get the stack up, see
+[Troubleshooting](#troubleshooting) first; it is committed, so a local edit
+changes every machine.
+
+### 4. Create your environment file
+
+```bash
+cp .env.example .env.local
+npx supabase status -o env      # prints the local URLs and keys
+```
+
+`.env.example` is the environment contract — read the comments in it, they
+mark which values are `[browser-safe]` and which are `[server-only]` and must
+never carry a `NEXT_PUBLIC_` prefix. The URLs are already filled in with the
+local defaults; copy the two keys from the `status` output:
+
+| `status -o env` prints | Goes into `.env.local` as |
+|---|---|
+| `ANON_KEY` | `NEXT_PUBLIC_SUPABASE_ANON_KEY` |
+| `SERVICE_ROLE_KEY` | `SUPABASE_SERVICE_ROLE_KEY` |
+
+The keys are the CLI's fixed local demo keys — identical on every machine for a
+given CLI version, and valid only against your local stack. Run
+`npx supabase status` (without `-o env`) any time for a readable summary.
+
+`.env.local` is gitignored, along with every `.env*.local`. If you ever find
+one in a diff, stop and read [../SECURITY.md](../SECURITY.md) — the `gitleaks`
+gate should have caught it, and if it didn't, that's a gate bug worth an issue.
+
+### 5. Apply migrations and seed
+
+```bash
+npm run db:reset
+```
+
+This drops the local database, replays every migration in
+`supabase/migrations/` from empty, then runs `supabase/seed.sql`. It is safe to
+run repeatedly — use it liberally. It is the only way to know your migrations
+still replay cleanly, and it is exactly what the schema-drift gate does in CI.
+See [09-database-changes.md](09-database-changes.md).
+
+Then confirm the stack answers:
+
+```bash
+npm run test:integration    # includes a real round trip to the local REST API
+```
 
 ### 6. Run the app — **[available after M0]**
 
@@ -187,10 +201,10 @@ command. See [08-ci-gates.md](08-ci-gates.md) for the job-to-script mapping.
 | `npm run test` | Unit suite (Vitest, `tests/unit/**`) |
 | `npm run test:watch` | Unit suite in watch mode |
 | `npm run test:coverage` | Unit suite with coverage thresholds enforced |
-| `npm run test:integration` | Integration suite — **needs `supabase start`** |
+| `npm run test:integration` | Integration suite — **needs `npx supabase start`** and the anon key in `.env.local` |
 | `npm run test:e2e` | Playwright E2E *[after M0-B09]* |
-| `npm run db:types` | Regenerate `types/database.types.ts` *[after M0-B05]* |
-| `npm run db:reset` | Replay every migration from empty *[after M0-B05]* |
+| `npm run db:types` | Regenerate `types/database.types.ts` *[after M0-B07]* |
+| `npm run db:reset` | Replay every migration from empty, then `supabase/seed.sql` |
 | `npm run verify` | Everything above except integration and E2E. **Run before pushing.** |
 
 `verify` deliberately omits `test:integration` and `test:e2e`: both need
@@ -202,21 +216,29 @@ naming the missing command, not a stack trace:
 
 ```text
 $ npm run db:reset
-  Local Supabase is not initialised yet (no supabase/config.toml).
-  This lands in M0-B05 — see tasks/backlog/m0-foundation.md.
+  The pinned Supabase CLI is not installed (node_modules/.bin/supabase).
+
+      npm ci
 ```
 
 ## Local Supabase ports
 
-`supabase start` binds these on `127.0.0.1`. Worth memorising, because a port
-conflict is the most common first-run failure:
+`npx supabase start` binds these on `127.0.0.1`, as set in the committed
+[`supabase/config.toml`](../supabase/config.toml). Worth memorising, because a
+port conflict is the most common first-run failure:
 
 | Port | Service | Notes |
 |---|---|---|
 | 54321 | API gateway (Kong) | This is your `NEXT_PUBLIC_SUPABASE_URL` — `http://127.0.0.1:54321` |
 | 54322 | Postgres | `SUPABASE_DB_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres` |
 | 54323 | Studio | Browser UI at <http://127.0.0.1:54323> — table editor, SQL editor, auth users |
-| 54324 | Inbucket (mail catcher) | Where local signup-confirmation and password-reset emails land |
+| 54324 | Mailpit (mail catcher) | Where local signup-confirmation and password-reset emails land. Older CLIs called this Inbucket; `config.toml` now names the section `[local_smtp]` |
+
+The local keys are not ports, but you will want them alongside:
+
+```bash
+npx supabase status -o env   # API_URL, DB_URL, ANON_KEY, SERVICE_ROLE_KEY, …
+```
 
 Use `127.0.0.1`, not `localhost`. On Windows and on some Node versions
 `localhost` resolves to `::1` first, and the containers bind IPv4 only — which
@@ -225,19 +247,35 @@ isn't.
 
 ## Troubleshooting
 
-### `supabase start` fails: "Cannot connect to the Docker daemon"
+### `supabase start` fails: Docker unreachable
 
-Docker Desktop isn't running, or is still starting. Launch it, wait until
+The wording varies by CLI version and platform — older CLIs say "Cannot
+connect to the Docker daemon"; CLI 2.120 reports a `DockerLifecycleInspectError`
+ending in "error during connect … connection refused". Either way, Docker
+Desktop isn't running, or is still starting. Launch it, wait until
 `docker info` returns without error, then retry. On Windows also confirm the WSL2
 backend is healthy — Docker Desktop reports this in Settings → Resources.
 Restarting Docker Desktop after a Windows update is a routine step, not a sign of
 a broken setup.
 
-### Port already in use
+### Port already in use — or `HealthCheckTimeoutError`
+
+On Windows a port conflict often does **not** say "port in use". Docker can
+bind alongside another process listening on the same port, and the stack then
+fails its own health checks: `supabase start` exits 1 with a
+`HealthCheckTimeoutError` naming `127.0.0.1:54321`. Treat that as a port
+conflict first:
+
+```powershell
+Get-NetTCPConnection -LocalPort 54321,54322,54323,54324 -State Listen |
+  Select-Object LocalAddress, LocalPort, OwningProcess
+```
+
+Any owner that is not Docker is the culprit. Otherwise:
 
 ```bash
-supabase stop            # in the other project's directory
-supabase stop --all      # or, from anywhere: stop every local Supabase stack
+npx supabase stop            # in the other project's directory
+npx supabase stop --all      # or, from anywhere: stop every local Supabase stack
 ```
 
 Two Supabase projects cannot run at once with default ports — they claim the same
@@ -288,11 +326,11 @@ Regenerate rather than hand-editing. `types/database.types.ts` is generated and
 marked `linguist-generated` for exactly this reason:
 
 ```bash
-npm run db:types      # [available after M0]
+npm run db:types      # [available after M0-B07]
 ```
 
 If it still disagrees, your local database has drifted from the migrations — run
-`supabase db reset` first, which replays from empty. See
+`npm run db:reset` first, which replays from empty. See
 [09-database-changes.md](09-database-changes.md).
 
 ## Next
