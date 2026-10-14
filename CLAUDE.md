@@ -68,7 +68,8 @@ acceptance criteria in the same PR**, so the doc never contradicts the code.
    npm run verify              # lint, boundaries, markdown, format, types
    npm run test                # unit            [after M0-B04]
    npm run test:integration    # integration     [after M0-B04]
-   supabase db reset && supabase test db   # schema + RLS  [after M0-B05]
+   npm run db:reset                        # schema replays from empty
+   npx supabase test db                    # RLS (pgTAP)   [after M1-B03]
    npm audit --audit-level=high --omit=dev
    ```
 

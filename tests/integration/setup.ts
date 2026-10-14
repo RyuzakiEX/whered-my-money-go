@@ -9,13 +9,22 @@
  * here that cannot be undone.
  */
 
+// Vitest does not read .env files for us. Load .env.local when it exists;
+// Node never overrides a variable that is already set, so CI's explicit env
+// wins over any file.
+try {
+  process.loadEnvFile('.env.local');
+} catch {
+  // No .env.local — fine in CI, and the anon-key check below says what to do.
+}
+
 const LOCAL_HOSTS = ['127.0.0.1', 'localhost', '0.0.0.0'];
 
 const dbUrl = process.env['SUPABASE_DB_URL'] ?? '';
 const apiUrl = process.env['NEXT_PUBLIC_SUPABASE_URL'] ?? '';
 
 function isLocal(url: string): boolean {
-  if (url === '') return true; // not configured yet — M0-B05
+  if (url === '') return true; // unset — the local defaults below apply
   return LOCAL_HOSTS.some((host) => url.includes(host));
 }
 
@@ -33,5 +42,15 @@ export const LOCAL_API_URL = apiUrl || 'http://127.0.0.1:54321';
 export const LOCAL_DB_URL =
   dbUrl || 'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
 
-/** True once M0-B05 has initialised the local stack. */
-export const supabaseConfigured = apiUrl !== '' || dbUrl !== '';
+const anonKey = process.env['NEXT_PUBLIC_SUPABASE_ANON_KEY'] ?? '';
+
+if (anonKey === '') {
+  throw new Error(
+    'NEXT_PUBLIC_SUPABASE_ANON_KEY is not set.\n' +
+      'Print the local keys with `npx supabase status -o env` and copy ANON_KEY ' +
+      'into .env.local. See workflow/01-local-setup.md.',
+  );
+}
+
+/** The local stack's anon JWT. Deterministic per CLI version, public by design. */
+export const LOCAL_ANON_KEY = anonKey;

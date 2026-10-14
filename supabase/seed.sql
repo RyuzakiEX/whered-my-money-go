@@ -1,0 +1,13 @@
+-- Local development seed.
+--
+-- Runs after every migration on `supabase db reset` (and `npm run db:reset`),
+-- against the LOCAL stack only — hosted projects never execute this file.
+--
+-- Intentionally empty: there is no schema yet. Seed rows arrive with the
+-- migrations that create their tables, starting in M1.
+--
+-- Rules for whatever lands here:
+--   - Must be re-runnable: `db reset` replays it from an empty database every
+--     time, so it may assume nothing beyond the migrations.
+--   - Money is integer minor units (ADR-0005). 123456, never 1234.56.
+--   - Fake people and fake amounts only. No real data, ever.
