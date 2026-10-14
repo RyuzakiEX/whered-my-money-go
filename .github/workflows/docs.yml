@@ -38,7 +38,7 @@ jobs:
       # not checked: a third-party site going down should never turn this repo
       # red. Enable network checks later on the scheduled run only.
       - name: Check relative links
-        uses: lycheeverse/lychee-action@82202e5e9c2f4ef1a55a3d02563e1cb6041e5332 # v2.4.1
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
         with:
           args: >-
             --offline
