@@ -98,3 +98,10 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "tailwindcss"
         update-types: ["version-update:semver-major"]
+      # ESLint is held on 9.x by M0-B02: eslint-config-next's plugins
+      # (eslint-plugin-react, -import, -jsx-a11y) declare peers of <=9, and
+      # ESLint 10 crashes lint outright ("Error while loading rule
+      # 'react/display-name'" — PR #12). Lift this when eslint-config-next
+      # supports 10, together with the pin in tasks/backlog/m0-foundation.md.
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
