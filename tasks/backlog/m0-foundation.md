@@ -23,7 +23,7 @@ exits 0 unconditionally is worse than nothing, because it buys false confidence.
 - [x] `npm run dev` serves the authenticated shell with all nine spec §25 sidebar items and the `+ Add Transaction` CTA — *M0-F02 (#33); breakpoint asserted by `tests/e2e/shell.spec.ts`*
 - [x] `npm run db:types` regenerates `types/database.types.ts` and CI fails when the committed file is stale — *M0-B07 (#31), shown failing in run 40831770069*
 - [x] Importing `lib/server/supabase/admin` from a client bundle throws, and lint blocks it outside the allowlist — *M0-B06 (#30)*
-- [ ] Branch protection blocks a direct push to `main`
+- [x] Branch protection blocks a direct push to `main` — *maintainer (admin) push to `main` at `2e5fd7a` rejected with GH013: PR required, 5 of 5 required checks expected; recorded on #41*
 
 ## Progress
 

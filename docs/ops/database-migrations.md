@@ -159,7 +159,7 @@ Seeds must be **idempotent** and must never run against production.
 
 ```text
 1. Merge the PR (all gates green, including schema).
-2. Apply migrations FIRST:     supabase db push
+2. Apply migrations FIRST:     supabase db push --linked
 3. Verify:                     schema matches; RLS on; smoke-check a query.
 4. Then deploy the app.
 5. Smoke test the affected flow on production.

@@ -39,7 +39,7 @@ automation.
 
 ```text
 1. Merge.                    All gates green.
-2. supabase db push          Migrations FIRST.
+2. supabase db push --linked Migrations FIRST.
 3. Verify the schema.        RLS on; a smoke query works.
 4. Vercel deploys.           Automatic.
 5. Smoke test production.
@@ -123,7 +123,7 @@ npx conventional-changelog -p conventionalcommits -i CHANGELOG.md -s
 □ All gates green on main
 □ Demo script passes on a preview deployment
 □ Migrations reviewed for backward compatibility
-□ supabase db push against production
+□ supabase db push --linked against production
 □ Schema verified: RLS on every table
 □ Vercel production deploy succeeded
 □ Smoke test passed (all 7 steps)
@@ -140,7 +140,7 @@ npx conventional-changelog -p conventionalcommits -i CHANGELOG.md -s
 ```text
 1.  Provision the production Supabase project (region near users).
 2.  supabase link --project-ref <production-ref>
-3.  supabase db push
+3.  supabase db push --linked
 4.  VERIFY RLS on every table. Manual. Non-negotiable.
 5.  Seed reference data only. NO demo data.
 6.  Configure Auth: site URL, redirect allowlist, email templates.

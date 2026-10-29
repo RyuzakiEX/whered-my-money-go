@@ -236,7 +236,7 @@ in `M2-B02`'s acceptance criteria.
 
 ```text
 1. Merge (all gates green).
-2. supabase db push          ← migrations FIRST
+2. supabase db push --linked ← migrations FIRST
 3. Verify: schema correct, RLS on, a smoke query works.
 4. Let Vercel deploy the app.
 5. Smoke test the affected flow.
