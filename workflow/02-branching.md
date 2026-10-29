@@ -115,20 +115,20 @@ Settings → Branches → branch protection rule for `main`:
 - [ ] **Allowed merge methods**: squash only. Disable merge commits and rebase
       merging in Settings → General → Pull Requests.
 
-### Why those three checks, and why they never sit pending
+### Why the aggregates, and why they never sit pending
 
-`ci-status`, `security-status`, and `docs-status` are **aggregate gate jobs**:
-each one depends on every real job in its workflow and runs with
-`if: always()`, so it reports green when its dependencies passed *or were
-skipped*, and red only on a genuine failure.
+`ci`, `security`, `docs`, `e2e`, and `schema` are **aggregate gate jobs**: each
+depends on every real job in its workflow, runs with `if: always()`, and is
+**green only when every one of those jobs succeeded** — a skip counts as a
+failure unless explicitly allowed for that run (M0-B08).
 
-This matters because of a specific GitHub behaviour: a required status check
-that never reports blocks the PR forever. If `unit` were required directly, then
-every PR that changes no code — every docs PR, which is currently all of them —
-would skip `unit` and wait indefinitely for a check that will never arrive.
-Requiring the aggregate instead means the required check always runs and always
-reports. Full explanation in
-[08-ci-gates.md](08-ci-gates.md#why-ci-is-green-on-an-empty-repo).
+Requiring the aggregate rather than the individual jobs matters because of a
+GitHub behaviour: a required status check that never reports blocks the PR
+forever. Required directly, a job that is renamed, split, or skipped by design
+on some events would leave PRs waiting for a check that will never arrive. The
+aggregate always runs and always reports, under one stable name. Full
+explanation in
+[08-ci-gates.md](08-ci-gates.md#no-gate-passes-by-not-running).
 
 ### Why Code Owners review is off
 

@@ -34,48 +34,30 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - id: detect
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ -f supabase/config.toml ]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "No supabase/config.toml yet — activated by M0-B05."
-          fi
-
-      # Same pinned CLI as `npx supabase` locally — see package.json.
       - name: Read pinned Supabase CLI version
         id: cli
-        if: steps.detect.outputs.run == 'true'
         shell: bash
         run: echo "version=$(node -p "require('./package.json').devDependencies.supabase")" >> "$GITHUB_OUTPUT"
 
       - uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v1
-        if: steps.detect.outputs.run == 'true'
         with:
           version: ${{ steps.cli.outputs.version }}
 
       - uses: ./.github/actions/setup-node-project
-        if: steps.detect.outputs.run == 'true'
         with:
           install: "false"
 
       - name: Start local Supabase
-        if: steps.detect.outputs.run == 'true'
         run: supabase start
 
       # --- Gate 1: migrations replay from empty ------------------------------
       # `db reset` drops and rebuilds from migrations only. A migration that
       # depends on hand-applied state fails here, which is the point.
       - name: Migrations replay from an empty database
-        if: steps.detect.outputs.run == 'true'
         run: supabase db reset
 
       # --- Gate 2: no schema drift -----------------------------------------
       - name: No uncommitted schema drift
-        if: steps.detect.outputs.run == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -103,7 +85,6 @@ jobs:
       # `npm ci` here), then diffs the committed file. One generator, one
       # comparison: the header and formatting cannot drift between the two.
       - name: Generated types match the schema
-        if: steps.detect.outputs.run == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -135,7 +116,6 @@ jobs:
       # table shipped without Row Level Security is world-readable to every
       # authenticated user. This check is why that cannot happen silently.
       - name: RLS enabled on every public table
-        if: steps.detect.outputs.run == 'true'
         shell: bash
         env:
           PGPASSWORD: postgres
@@ -172,7 +152,6 @@ jobs:
       # RLS enabled with zero policies is default-deny, which fails closed and
       # is therefore safe — but it is almost always a mistake, so flag it.
       - name: Every RLS table has at least one policy
-        if: steps.detect.outputs.run == 'true'
         shell: bash
         env:
           PGPASSWORD: postgres
@@ -195,7 +174,6 @@ jobs:
 
       # --- Gate 4c: pgTAP isolation tests ----------------------------------
       - name: pgTAP RLS isolation tests
-        if: steps.detect.outputs.run == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -206,7 +184,7 @@ jobs:
           supabase test db
 
       - name: Stop local Supabase
-        if: always() && steps.detect.outputs.run == 'true'
+        if: always()
         run: supabase stop --no-backup || true
 
   schema-status:
@@ -216,19 +194,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Check results
-        shell: bash
-        env:
-          NEEDS: ${{ toJSON(needs) }}
-        run: |
-          set -euo pipefail
-          # grep exits 1 when it finds nothing, which under `set -e` kills the
-          # script before the comparison — so these gates failed precisely when
-          # NOTHING had failed. `|| true` is load-bearing.
-          failed=$(printf '%s' "$NEEDS" | grep -c '"result": *"failure"' || true)
-          cancelled=$(printf '%s' "$NEEDS" | grep -c '"result": *"cancelled"' || true)
-          if [ "$failed" -gt 0 ] || [ "$cancelled" -gt 0 ]; then
-            echo "::error::Schema gate failed. See workflow/09-database-changes.md."
-            exit 1
-          fi
-          echo "Schema gates passed or were skipped."
+      # The action is local, so the checkout is needed to find it.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: ./.github/actions/require-results
+        with:
+          needs: ${{ toJSON(needs) }}
+          failure-hint: "See workflow/09-database-changes.md."

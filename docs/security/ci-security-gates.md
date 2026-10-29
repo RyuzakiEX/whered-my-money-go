@@ -32,6 +32,7 @@ leaves a gap the others cover.
 | **CodeQL** | Injection, taint flows, unsafe patterns in our own code; **workflow injection** in Actions | Third-party code; runtime configuration |
 | **dependency review** | Newly *introduced* vulnerable or copyleft dependencies, on the diff | Existing dependencies already in `main` |
 | **npm audit** | Advisories against the resolved lockfile tree | Non-npm risk; unpublished advisories |
+| **actionlint** | Workflow files that would fail to load or misbehave: invalid expression contexts, bad job references, shellcheck findings in `run:` blocks. A workflow that fails to load posts no status, so its gates vanish rather than going red | Injection via untrusted inputs (CodeQL's job); a valid workflow that checks the wrong thing |
 
 Three details worth knowing:
 
