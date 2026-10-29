@@ -4,9 +4,9 @@
 title must be one too, because squash-merging makes it the commit message on
 `main`.
 
-Enforced by `commitlint` from [`M0-B11`](../tasks/backlog/m0-foundation.md).
-Until that lands, the convention is manual — which is exactly why the initial
-commit series follows it.
+Enforced by `commitlint` ([`commitlint.config.mjs`](../commitlint.config.mjs))
+in two places: a local `commit-msg` hook, and the **commit messages** CI job,
+which checks every commit in a PR *and* the PR title. See [Hooks](#hooks).
 
 ## Shape
 
@@ -56,8 +56,13 @@ so an issue's area label tells you the scope without thinking:
 
 ```text
 auth · accounts · transactions · categories · budgets · goals
-timeline · sts · dashboard · reports · db · rls · ci · docs · ui · a11y
+timeline · sts · dashboard · reports · db · rls · ci · ui · a11y
+deps · deps-dev          ← dependency bumps (Dependabot's convention)
 ```
+
+`commitlint.config.mjs` **reads the list from `tasks/labels.md`**, so adding an
+`area:` label adds the scope — the two cannot drift. `docs` is a *type*, not a
+scope: write `docs(sts): …`, not `docs(docs): …`.
 
 `sts` is Safe to Spend. Short because it is typed often.
 
@@ -70,7 +75,7 @@ scope is how you reconstruct a feature's history later.
 | Rule | Why |
 |---|---|
 | **Imperative mood** — "add", not "added" or "adds" | Matches `git revert`/`git merge`'s own generated messages |
-| **Subject ≤ 72 characters** | Longer truncates in `git log --oneline` and GitHub's UI |
+| **Subject ≤ 72 characters** — the whole header | Longer truncates in `git log --oneline` and GitHub's UI. **Squash merge appends `(#N)`**, so keep PR titles to about 65; CI lints the title *with* that suffix |
 | **No trailing period** | It is a title, not a sentence |
 | **Lowercase after the colon** | Consistency; the type already capitalises the line visually |
 | **Body explains *why*** | The diff already shows what. The reasoning is the part that gets lost |
@@ -139,14 +144,33 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 Attribution rules and what AI must not author unreviewed:
 [11-agent-and-ai-usage.md](11-agent-and-ai-usage.md).
 
-## Local check
+## Hooks
 
-`commitlint` runs on `commit-msg` once [`M0-B11`](../tasks/backlog/m0-foundation.md)
-lands. To check the last commit manually:
+Installed automatically by `npm install` (the `prepare` script runs Husky).
+
+| Hook | Runs | Typical time |
+|---|---|---|
+| `commit-msg` | `commitlint` on the message | < 1 s |
+| `pre-commit` | `lint-staged`: Prettier on every staged file; Prettier **then** ESLint on staged TypeScript | ~4 s for a 1–3 file change, dominated by type-aware ESLint loading the TS program |
+
+To check the last commit manually:
 
 ```bash
 npx commitlint --from HEAD~1 --to HEAD --verbose
 ```
+
+### Escape hatch
+
+For an emergency — a broken hook, a hotfix that cannot wait for a lint fix:
+
+```bash
+git commit --no-verify -m "fix(ci): …"     # skip both hooks for one commit
+HUSKY=0 git commit -m "…"                  # same, via environment
+```
+
+**CI still enforces the same rules.** The commit messages job lints every
+commit in the PR and the title; lint and format run in the lint job. Skipping
+the hook moves the failure later, it does not remove it.
 
 ## Next
 

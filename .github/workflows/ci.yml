@@ -139,6 +139,46 @@ jobs:
       - name: Check formatting
         run: npm run format:check
 
+  # The same commitlint rules as the local commit-msg hook (M0-B11). Hooks
+  # can be skipped with --no-verify; this cannot, so the convention holds.
+  commitlint:
+    name: commit messages
+    needs: preflight
+    # hashFiles() is unavailable in a job-level `if` (the whole workflow
+    # fails to load), so no file check here; the config exists from M0-B11.
+    if: >-
+      github.event_name == 'pull_request' &&
+      needs.preflight.outputs.has_app == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          # Both ends of the PR's commit range must be present locally.
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-node-project
+
+      # Merge and revert commits are skipped by commitlint's defaults, and
+      # Dependabot's by commitlint.config.mjs. A human commit pushed onto a
+      # Dependabot PR is still checked.
+      - name: Every commit in the PR
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: npx --no -- commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
+
+      # Squash merge makes the PR title the commit on main (workflow/03-commits.md),
+      # so it is the message that matters most. GitHub appends " (#N)" to it,
+      # so that suffix is linted too — a 70-character title becomes a
+      # 76-character header on main. Passed via env, never interpolated into
+      # the script: a PR title is untrusted input.
+      - name: PR title, as it will land on main
+        if: github.event.pull_request.user.login != 'dependabot[bot]'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: printf '%s (#%s)\n' "$PR_TITLE" "$PR_NUMBER" | npx --no -- commitlint --verbose
+
   typecheck:
     name: typecheck
     needs: preflight
@@ -272,7 +312,7 @@ jobs:
   # ---------------------------------------------------------------------------
   ci:
     name: ci
-    needs: [preflight, lint, typecheck, unit, integration, build]
+    needs: [preflight, lint, commitlint, typecheck, unit, integration, build]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

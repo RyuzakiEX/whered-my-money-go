@@ -33,6 +33,7 @@ They never need changing as the project grows — that is the whole design, and
 |---|---|---|---|
 | **preflight (detect project)** | No — always passes | Detects `package.json`, lockfile, tests, `supabase/config.toml`, migrations. Writes a summary table. | — |
 | **lint** | Yes | ESLint, the [import-boundary assertion](../docs/architecture/source-structure.md#import-rules), and Prettier | `npm run lint && npm run lint:boundaries && npm run format:check` |
+| **commit messages** | Yes (PRs only) | commitlint on every commit in the PR, and on the PR title **with the `(#N)` squash suffix** — the header that lands on `main`. Dependabot's commits and titles are skipped | `npx commitlint --from origin/main --to HEAD` |
 | **typecheck** | Yes | `tsc --noEmit`, strict | `npm run typecheck` |
 | **unit tests** | Yes | Vitest + coverage thresholds | `npm run test -- --coverage` |
 | **integration tests** | Yes | Vitest against a local Supabase | `supabase start && npm run test:integration` |

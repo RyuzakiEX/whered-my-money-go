@@ -1,0 +1,2 @@
+# Conventional Commits, scopes from tasks/labels.md. See workflow/03-commits.md.
+npx --no -- commitlint --edit "$1"

@@ -1,0 +1,2 @@
+# Format staged files, lint staged TypeScript. See lint-staged.config.mjs.
+npx --no -- lint-staged
