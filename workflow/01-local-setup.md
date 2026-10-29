@@ -83,6 +83,9 @@ npm ci
 your local environment would stop matching CI's. This also installs the pinned
 Supabase CLI, which the next step needs.
 
+It also installs the git hooks (`commit-msg`, `pre-commit`) through the
+`prepare` script — see [03-commits.md](03-commits.md#hooks).
+
 ### 3. Start local Supabase
 
 ```bash

@@ -25,7 +25,8 @@
     "test:e2e": "node scripts/require-playwright.mjs",
     "db:types": "node scripts/gen-db-types.mjs",
     "db:reset": "node scripts/require-supabase.mjs db reset",
-    "verify": "npm run lint && npm run lint:boundaries && npm run lint:md && npm run format:check && npm run typecheck && npm run test:coverage"
+    "verify": "npm run lint && npm run lint:boundaries && npm run lint:md && npm run format:check && npm run typecheck && npm run test:coverage",
+    "prepare": "husky"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.7",
@@ -43,6 +44,8 @@
     "vaul": "1.1.2"
   },
   "devDependencies": {
+    "@commitlint/cli": "21.2.4",
+    "@commitlint/config-conventional": "21.2.4",
     "@tailwindcss/postcss": "4.3.3",
     "@testing-library/dom": "10.4.2",
     "@testing-library/react": "16.3.3",
@@ -54,7 +57,9 @@
     "eslint": "9.39.5",
     "eslint-config-next": "16.4.3",
     "eslint-config-prettier": "10.1.8",
+    "husky": "9.1.7",
     "jsdom": "29.1.1",
+    "lint-staged": "17.6.0",
     "markdownlint-cli2": "0.24.0",
     "postcss": "8.5.32",
     "prettier": "3.9.10",
