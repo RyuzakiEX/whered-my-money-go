@@ -144,10 +144,11 @@ jobs:
   commitlint:
     name: commit messages
     needs: preflight
+    # hashFiles() is unavailable in a job-level `if` (the whole workflow
+    # fails to load), so no file check here; the config exists from M0-B11.
     if: >-
       github.event_name == 'pull_request' &&
-      needs.preflight.outputs.has_app == 'true' &&
-      hashFiles('commitlint.config.mjs') != ''
+      needs.preflight.outputs.has_app == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
