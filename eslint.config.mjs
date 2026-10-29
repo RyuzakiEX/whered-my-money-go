@@ -349,6 +349,20 @@ export default tseslint.config(
     },
   },
 
+  // shadcn primitives are COPIED from upstream, and frontend-architecture.md
+  // asks that they stay close to it so they can be regenerated when upstream
+  // fixes an accessibility bug. These four stylistic rules fire on upstream
+  // code as written; fixing them by hand would fork every primitive.
+  {
+    files: ['components/ui/**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/array-type': 'off',
+      '@typescript-eslint/no-unnecessary-condition': 'off',
+      '@typescript-eslint/prefer-nullish-coalescing': 'off',
+      '@typescript-eslint/restrict-template-expressions': 'off',
+    },
+  },
+
   // Must stay last: turns off every rule Prettier owns.
   prettierConfig,
 );

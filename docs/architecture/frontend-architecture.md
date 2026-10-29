@@ -108,13 +108,31 @@ the model, and it has consequences worth stating:
 - **Feature components compose primitives**; primitives never import feature
   components.
 
-Primitives expected by M0-F01: `button`, `input`, `label`, `select`, `dialog`,
-`sheet`, `dropdown-menu`, `popover`, `calendar`, `table`, `card`, `badge`,
-`progress`, `skeleton`, `toast`, `tabs`, `form`, `alert`.
+Primitives installed by M0-F01 (style `radix-nova`): `button`, `input`,
+`label`, `select`, `dialog`, `sheet`, `drawer`, `dropdown-menu`, `popover`,
+`table`, `card`, `badge`, `progress`, `skeleton`, `sonner` (shadcn's toast),
+`tabs`, `field`, `alert`, and `separator` (a dependency of `field`).
 
-`/dev/kitchen-sink` renders every primitive in both themes and at both extremes
-of the type scale. It exists because a token change silently breaking one
-variant is otherwise found by a user.
+- **`field`, not `form`.** In the current registry `form` is an empty stub;
+  `field` replaces it — label, description, and an accessible error, with no
+  form-library dependency. The form library is chosen when the first real form
+  lands.
+- **`calendar` is deferred** to the first task that needs a date picker. It
+  pulls in `react-day-picker` and `date-fns`, and
+  [ADR-0003](../adr/0003-pure-typescript-domain-core.md) kept a date library
+  out deliberately; that trade-off deserves its own decision, not a side effect
+  of installing primitives.
+- **Local edits to generated files are marked** with a `Local change:` comment
+  (today: one cast in `sonner.tsx` for `exactOptionalPropertyTypes`). Four
+  stylistic lint rules are relaxed for `components/ui/**` instead of editing
+  upstream code — see `eslint.config.mjs`.
+
+`/dev/kitchen-sink` renders every primitive in default, hover, focus, disabled,
+and error states, at both extremes of the type scale, with a theme toggle. It
+exists because a token change silently breaking one variant is otherwise found
+by a user. Hover and focus render statically through a `data-force-state`
+attribute that the `hover` and `focus-visible` variants in `app/globals.css`
+also match. Production builds return 404 for the route.
 
 ## Chart isolation
 
@@ -153,15 +171,24 @@ CSS custom properties, defined once, consumed everywhere. Tailwind maps to them
 rather than to raw hex values, so no component hardcodes a colour.
 
 ```text
-Semantic (not literal) naming:
+Semantic (not literal) naming — defined in app/globals.css, both themes:
 
---color-bg / -surface / -border / -fg / -fg-muted
---color-primary            brand action
---color-income             money in      (green family)
---color-expense            money out     (red family)
---color-sts-green / -amber / -red        Safe to Spend bands
---color-budget-on-track / -at-risk / -over / -exceeded
+--background / --foreground, --card, --popover, --muted / --muted-foreground,
+--border, --input, --ring          surfaces and text (shadcn's names)
+--primary, --destructive           brand action, irreversible action
+--income                           money in      (green family)
+--expense                          money out     (red family)
+--status-green / -amber / -red     Safe to Spend bands AND budget bands
 ```
+
+Tailwind exposes each as a utility (`text-income`, `bg-status-amber`). Budget
+statuses (`on_track` / `at_risk` / `over` / `exceeded`) map onto the three
+status colours in M5; the mapping is a budget-UI decision, not a token.
+
+**AA is a test, not a promise.** `tests/unit/design/contrast.test.ts` parses the
+tokens out of `app/globals.css` and asserts every rendered pair in both themes:
+4.5:1 for text, 3:1 for the input boundary and the focus ring. A palette change
+that drops a pair below AA fails `npm run test`.
 
 **Money direction is a semantic token, not a literal colour**, because it must
 carry meaning in dark mode, at AA contrast, and — crucially — never *only* by

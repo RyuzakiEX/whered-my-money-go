@@ -1,5 +1,14 @@
 import type { Metadata, Viewport } from 'next';
+import { Geist } from 'next/font/google';
 import type { ReactNode } from 'react';
+
+import { ThemeProvider } from '@/components/theme/theme-provider';
+import { cn } from '@/components/ui/cn';
+import { Toaster } from '@/components/ui/sonner';
+
+import './globals.css';
+
+const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
 
 export const metadata: Metadata = {
   title: {
@@ -23,8 +32,20 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    // suppressHydrationWarning: next-themes sets the theme class on <html>
+    // before React hydrates, so the server and client class lists differ by
+    // design. It applies to this element only, not its children.
+    <html
+      lang="en"
+      className={cn('font-sans', geist.variable)}
+      suppressHydrationWarning
+    >
+      <body>
+        <ThemeProvider>
+          {children}
+          <Toaster />
+        </ThemeProvider>
+      </body>
     </html>
   );
 }
