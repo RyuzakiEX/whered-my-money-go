@@ -87,33 +87,39 @@ enforces this mechanically anyway.
 
 > [!NOTE]
 > This is a **GitHub repository setting**, not a file in the repo, so it cannot
-> be reviewed in a PR and cannot be verified by CI. It is written down here
-> because a setting nobody wrote down is a setting that silently drifts. Verify
-> it against this list whenever the CI workflows change.
+> be reviewed in a PR. It is written down here because a setting nobody wrote
+> down is a setting that silently drifts. Verify it against this list whenever
+> the CI workflows change — the commands at the end print the live values.
 
-Settings → Branches → branch protection rule for `main`:
+Configured in **M0-B12** as the repository **ruleset `main`** (Settings → Rules
+→ Rulesets), targeting the default branch, plus Settings → General → Pull
+Requests. Last verified 2026-10-29.
 
-- [ ] **Require a pull request before merging** — no direct pushes.
-- [ ] **Require status checks to pass**, and require exactly these three:
-  - [ ] `ci-status` (from `ci.yml`)
-  - [ ] `security-status` (from `security.yml`)
-  - [ ] `docs-status` (from `docs.yml`)
-- [ ] **Require branches to be up to date before merging** — off. With rebase
-      and a solo dev this only adds forced churn; turn it on when concurrent PRs
-      become normal.
-- [ ] **Require conversation resolution before merging** — on. Even solo: an
-      unresolved thread on your own PR is a note-to-self you'd otherwise merge
-      past.
-- [ ] **Require linear history** — on. Squash-only merges plus rebase updates
-      produce linear history for free; the setting is there to make an
-      accidental merge commit impossible.
-- [ ] **Do not allow force pushes** — on.
-- [ ] **Do not allow deletions** — on.
-- [ ] **Require review from Code Owners** — **OFF while solo.** See below.
-- [ ] **Include administrators** — on. A protection rule you can bypass isn't
-      one; the whole value is that it applies on the day you're in a hurry.
-- [ ] **Allowed merge methods**: squash only. Disable merge commits and rebase
-      merging in Settings → General → Pull Requests.
+| Setting | Value | Notes |
+|---|---|---|
+| Require a pull request before merging | ✅ on | No direct pushes. |
+| Bypass list | **empty** | Applies to administrators too (`current_user_can_bypass: never`). A rule you can bypass isn't one; its value is the day you're in a hurry. |
+| Required status checks | ✅ `ci` · `security` · `docs` · `e2e` · `schema` | Exactly the five aggregates from [08-ci-gates.md](08-ci-gates.md), each bound to the **GitHub Actions** app (integration 15368), so a status posted under the same name by anything else does not count. |
+| Require branches to be up to date | ✅ on | A PR is tested against the `main` it will land on. Costs an update-and-rerun after each merge; worth it now that CI is the only reviewer. |
+| Required approving reviews | ⚠️ **0** — deviation | The backlog asks for 1. GitHub does not let you approve your own PR, so on a solo repo 1 blocks every merge. **Set it to 1 in the same change that adds a second maintainer.** |
+| Dismiss stale approvals on new commits | ✅ on | No effect at 0 approvals; already correct for when that changes. |
+| Require conversation resolution | ✅ on | Even solo: an unresolved thread on your own PR is a note-to-self you'd otherwise merge past. |
+| Require linear history | ✅ on | Squash-only already produces it; this makes an accidental merge commit impossible. |
+| Block force pushes | ✅ on | |
+| Block deletion | ✅ on | |
+| Require review from Code Owners | ❌ off | **Off while solo** — see below. |
+| Allowed merge methods | **squash only** | Merge commits and rebase merging disabled in the ruleset *and* the repository settings. |
+| Squash commit title | **PR title** | So `main`'s history is the PR titles — which CI lints with the `(#N)` suffix ([03-commits.md](03-commits.md)). |
+| Squash commit message | Commit messages | Keeps each commit's *why* in `main`'s log. |
+| Delete head branch on merge | ✅ on | |
+
+Print the live configuration:
+
+```bash
+gh api repos/RyuzakiEX/whered-my-money-go/rules/branches/main
+gh api repos/RyuzakiEX/whered-my-money-go \
+  -q '{allow_squash_merge, allow_merge_commit, allow_rebase_merge, squash_merge_commit_title}'
+```
 
 ### Why the aggregates, and why they never sit pending
 
