@@ -1,6 +1,3 @@
-// M0-B10 demonstration: a build that fails must not deploy. Reverted next commit.
-import { doesNotExist } from './does-not-exist';
-void doesNotExist;
 export default function HomePage() {
   return (
     <main>
