@@ -205,10 +205,35 @@ command. See [08-ci-gates.md](08-ci-gates.md) for the job-to-script mapping.
 | `npm run test:watch` | Unit suite in watch mode |
 | `npm run test:coverage` | Unit suite with coverage thresholds enforced |
 | `npm run test:integration` | Integration suite — **needs `npx supabase start`** and the anon key in `.env.local` |
-| `npm run test:e2e` | Playwright E2E *[after M0-B09]* |
+| `npm run test:e2e` | Playwright E2E — starts `npm run dev` itself, or reuses one already on port 3000. See [Running E2E](#running-e2e) |
 | `npm run db:types` | Regenerate `types/database.types.ts` from the local database — **needs `npx supabase start`** |
 | `npm run db:reset` | Replay every migration from empty, then `supabase/seed.sql` |
 | `npm run verify` | Everything above except integration and E2E. **Run before pushing.** |
+
+### Running E2E
+
+```bash
+npx playwright install chromium   # once per Playwright version
+npm run test:e2e                  # whole suite
+npm run test:e2e -- smoke         # one file
+npx playwright show-report        # after a failure; traces open from here
+```
+
+Chromium needs system libraries (`libnss3`, `libnspr4`, `libasound2`). Install
+them once with `sudo npx playwright install-deps chromium`. **Without `sudo`**,
+run the suite in Microsoft's image, which has them — the version must match the
+`@playwright/test` pin:
+
+```bash
+npm run build
+docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -e CI=1 \
+  -v "$PWD:/repo" -w /repo mcr.microsoft.com/playwright:v1.64.1-noble \
+  npx playwright test
+```
+
+`CI=1` makes Playwright start the production server and enables retries, the
+same as CI. The app has to start *inside* the container: with Docker Desktop,
+the container cannot reach a server on WSL's `localhost`.
 
 `verify` deliberately omits `test:integration` and `test:e2e`: both need
 services running, and a pre-push check that fails because Docker is stopped is

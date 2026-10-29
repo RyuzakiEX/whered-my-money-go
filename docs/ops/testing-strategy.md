@@ -120,6 +120,14 @@ invalidation set.
 Playwright, Chromium only. A cross-browser matrix triples runtime for a suite
 whose job is catching broken flows, not rendering differences.
 
+**CI runs it against a production build** (`npm run build`, then
+`playwright.config.ts` starts `npm run start`), with two retries, a trace on the
+first retry, and screenshots on failure; the HTML report is uploaded on every
+run. Locally there are no retries — a flaky test should be seen, not absorbed.
+
+Alongside the smoke test (`M0-B09`), `tests/e2e/shell.spec.ts` asserts the app
+shell's 768px breakpoint, the one `M0-F02` behaviour jsdom cannot see.
+
 **The suite is scoped to spec §31's nine questions.** Each gets one assertion,
 and each is owned by the milestone that makes it answerable:
 
