@@ -37,7 +37,7 @@ env:
 jobs:
   drift:
     name: schema drift
-    # packages: read lets GITHUB_TOKEN authenticate the image pulls below.
+    # packages: read lets the start-supabase action authenticate its pulls.
     # Job-level permissions replace the workflow's, so contents: read is
     # restated.
     permissions:
@@ -61,19 +61,8 @@ jobs:
         with:
           install: "false"
 
-      # Authenticated pulls. Anonymous ghcr.io pulls share a per-IP rate limit
-      # with every other job on the runner's egress IP, and #44's first run
-      # was refused mid-pull ("retry-after … allowed: 44000/minute").
-      # GITHUB_TOKEN is minted per run (read-only on fork PRs), so this adds
-      # no repository secret.
-      - name: Log in to ghcr.io
-        env:
-          GH_TOKEN: ${{ github.token }}
-          ACTOR: ${{ github.actor }}
-        run: echo "$GH_TOKEN" | docker login ghcr.io --username "$ACTOR" --password-stdin
-
       - name: Start local Supabase
-        run: supabase start
+        uses: ./.github/actions/start-supabase
 
       # --- Gate 1: migrations replay from empty ------------------------------
       # `db reset` drops and rebuilds from migrations only. A migration that
