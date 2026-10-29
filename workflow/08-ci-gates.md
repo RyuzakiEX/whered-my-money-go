@@ -133,12 +133,13 @@ expiry date, and review):
 | **No `pull_request_target`** | It runs with secrets against untrusted code. |
 | Aggregates use `require-results` | One strict implementation of "every job succeeded", instead of five copies of a lenient one. |
 | No `paths-ignore` on **any** workflow | Every aggregate is a required check. `e2e.yml` lost its filter in M0-B08; with the browser cache the job takes about three minutes. |
-| `SUPABASE_INTERNAL_IMAGE_REGISTRY: ghcr.io` at workflow level in `ci.yml`, `e2e.yml`, `schema-drift.yml` | The CLI pulls the local stack from `public.ecr.aws` by default, and anonymous ECR pulls are quota-limited per source IP. On #43, `supabase start` failed every pull with `Data limit exceeded` while sibling jobs on other runners passed. GitHub's own registry avoids that quota. Local development keeps the default. |
+| **Authenticated `ghcr.io` pulls** for the local Supabase stack: `SUPABASE_INTERNAL_IMAGE_REGISTRY: ghcr.io` at workflow level, plus a `docker login ghcr.io` step with `GITHUB_TOKEN` and job-level `packages: read`, in `ci.yml` (integration), `e2e.yml`, and `schema-drift.yml` | Anonymous pulls are rate-limited per source IP on **both** registries, and runners share egress IPs. The CLI default, `public.ecr.aws`, failed #43 with `Data limit exceeded`; anonymous `ghcr.io` failed #44's first run with `retry-after … allowed: 44000/minute`. Authenticated pulls count against the repository instead. `GITHUB_TOKEN` is minted per run and read-only on fork PRs, so no gate gains a repository secret. Local development keeps the defaults. |
 
-**`supabase start` failing with `Data limit exceeded` or `toomanyrequests`** is
-a registry quota, not your change. Check which registry the failing pull names
-before re-running: if it is not `ghcr.io`, a workflow has lost the variable
-above.
+**`supabase start` failing with `Data limit exceeded`, `toomanyrequests`, or
+`retry-after`** is a registry quota, not your change. Check the failing pull
+before re-running: it should name `ghcr.io`, and the job should show the
+`Log in to ghcr.io` step succeeding. If either is missing, a workflow has lost
+half of the setup above.
 
 ## Next
 
