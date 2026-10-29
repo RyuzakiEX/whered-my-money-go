@@ -70,6 +70,7 @@ If none applies, it stays a Server Component.
 | Concern | Component type | Why |
 |---|---|---|
 | Page shells, layouts | Server | No interaction |
+| Active nav item (`NavLink`) | Client | `aria-current` needs `usePathname()`; a server layout never receives the path |
 | Any money figure or total | **Server** | `lib/core` is server-only; see below |
 | Lists and tables | Server | Rendered from RLS-scoped reads |
 | Forms | Client | Controlled inputs, validation feedback |

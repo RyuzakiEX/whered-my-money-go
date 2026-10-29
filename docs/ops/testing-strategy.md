@@ -61,6 +61,17 @@ own worked example:
 doc, the unit test, and the E2E test. All four agree on what "correct" means, so
 a disagreement is a test failure rather than a discussion.
 
+**Component tests** live under `tests/unit/components/` and run in the same
+project. The project's environment is `node`; a file that needs a DOM opts in
+with a `// @vitest-environment jsdom` first line and uses Testing Library. They
+cover behaviour a user depends on that has no browser-free equivalent — the
+mobile drawer's Escape, backdrop, focus trap, and focus restore (`M0-F02`). They
+do not replace E2E: jsdom has no layout, so breakpoints and visibility are E2E's
+job.
+
+**Design-token contrast** is a unit test too: `tests/unit/design/contrast.test.ts`
+asserts WCAG AA for every token pair in both themes (`M0-F01`).
+
 **Property tests** (fast-check) encode the invariants each domain doc lists —
 "adding an expense never increases Safe to Spend", "the breakdown sums to the
 total", "shuffling timeline input yields identical output". These catch the
