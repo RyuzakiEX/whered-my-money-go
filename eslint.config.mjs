@@ -181,6 +181,9 @@ export default tseslint.config(
                 'lib/server must not import components. Data flows server -> component, never back.',
             },
             CHART_PACKAGES,
+            // Queries and actions are reachable from app/, so the admin
+            // allowlist has to hold here too — not only in app/ itself.
+            ADMIN_CLIENT,
           ],
         },
       ],

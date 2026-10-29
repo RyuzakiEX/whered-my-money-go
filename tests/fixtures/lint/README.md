@@ -28,6 +28,7 @@ the RLS gate by deliberately adding a table without policies.
 | `component-imports-server.tsx` | `components/**` importing `lib/server` | Row 6 |
 | `app-imports-admin.ts` | `app/**` importing the `service_role` client | Row 5 |
 | `component-imports-chart.tsx` | charting library outside `components/charts` | Row 8 |
+| `server-imports-admin.ts` | `lib/server/**` importing the `service_role` client — reachable from `app/` one hop removed | [`admin.ts` allowlist](../../../docs/architecture/source-structure.md#the-admints-restriction) |
 
 ## Rules
 

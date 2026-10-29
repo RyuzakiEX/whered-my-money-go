@@ -36,7 +36,7 @@ exits 0 unconditionally is worse than nothing, because it buys false confidence.
 | [ ] | M0-F01 | `[M0][FE] Install shadcn/ui with design tokens, dark mode, and a kitchen-sink page` |
 | [ ] | M0-F02 | `[M0][FE] Build the authenticated app shell` |
 | [x] | M0-B05 | `[M0][BE] Initialize local Supabase` |
-| [ ] | M0-B06 | `[M0][BE] Create the three Supabase client factories` |
+| [x] | M0-B06 | `[M0][BE] Create the three Supabase client factories` |
 | [ ] | M0-B07 | `[M0][BE] Wire database type generation` |
 | [ ] | M0-B08 | `[M0][DO] Activate CI jobs now that package.json exists` |
 | [ ] | M0-B09 | `[M0][DO] Add Playwright config and a smoke E2E test` |

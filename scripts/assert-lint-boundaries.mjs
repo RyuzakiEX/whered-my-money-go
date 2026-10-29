@@ -24,6 +24,7 @@ const EXPECTED = {
   'components/component-imports-server.tsx': 'no-restricted-imports',
   'components/component-imports-chart.tsx': 'no-restricted-imports',
   'app/app-imports-admin.ts': 'no-restricted-imports',
+  'lib/server/server-imports-admin.ts': 'no-restricted-imports',
 };
 
 function walk(dir) {

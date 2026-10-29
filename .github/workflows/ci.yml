@@ -205,18 +205,25 @@ jobs:
         run: supabase db reset --no-seed=false
 
       # The smoke test makes an authenticated round trip, so it needs the local
-      # anon key. It is the CLI's fixed demo key — public, and only valid
-      # against this throwaway stack.
-      - name: Export local anon key
+      # anon key. The client-factory test also creates and deletes a throwaway
+      # user, which needs the service-role key. Both are the CLI's demo keys
+      # for THIS throwaway stack — created by `supabase start` above, valid
+      # nowhere else, and never stored as repository secrets.
+      - name: Export local Supabase keys
         shell: bash
         run: |
           set -euo pipefail
-          key=$(supabase status -o env | sed -n 's/^ANON_KEY="\(.*\)"$/\1/p')
-          if [ -z "$key" ]; then
-            echo "::error::Could not read ANON_KEY from 'supabase status -o env'."
+          status=$(supabase status -o env)
+          anon=$(sed -n 's/^ANON_KEY="\(.*\)"$/\1/p' <<<"$status")
+          service=$(sed -n 's/^SERVICE_ROLE_KEY="\(.*\)"$/\1/p' <<<"$status")
+          if [ -z "$anon" ] || [ -z "$service" ]; then
+            echo "::error::Could not read ANON_KEY and SERVICE_ROLE_KEY from 'supabase status -o env'."
             exit 1
           fi
-          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$key" >> "$GITHUB_ENV"
+          # Demo keys, but keep them out of logs anyway: a habit worth having.
+          echo "::add-mask::$service"
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$anon" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_ROLE_KEY=$service" >> "$GITHUB_ENV"
 
       - name: Run integration tests
         run: npm run test:integration
