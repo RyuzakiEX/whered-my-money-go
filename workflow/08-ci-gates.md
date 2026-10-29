@@ -1,8 +1,9 @@
 # CI Gates
 
-**Six workflows, five required status checks.** Every job either passes, or is
-skipped because the code it checks does not exist yet — and a skipped job never
-blocks a pull request.
+**Six workflows, five required status checks.** Every job runs on every pull
+request and does real work. **No gate passes by not running**: a skipped job
+fails its aggregate unless it is one of the two listed exceptions
+([below](#no-gate-passes-by-not-running)).
 
 ## Required status checks
 
@@ -13,15 +14,15 @@ gates**, not individual jobs:
 ci · security · docs · e2e · schema
 ```
 
-They never need changing as the project grows — that is the whole design, and
-[why](#why-ci-is-green-on-an-empty-repo) is below.
+They never need changing as the project grows: a new job joins its workflow's
+aggregate, and the aggregate is what branch protection requires.
 
 ## The workflows
 
 | Workflow | Required check | Jobs |
 |---|---|---|
-| [`ci.yml`](../.github/workflows/ci.yml) | **`ci`** | preflight · lint · typecheck · unit tests · integration tests · build |
-| [`security.yml`](../.github/workflows/security.yml) | **`security`** | gitleaks · trivy · dependency review · npm audit |
+| [`ci.yml`](../.github/workflows/ci.yml) | **`ci`** | lint · commit messages · typecheck · unit tests · integration tests · build |
+| [`security.yml`](../.github/workflows/security.yml) | **`security`** | gitleaks · trivy · dependency review · npm audit · actionlint (workflows) |
 | [`docs.yml`](../.github/workflows/docs.yml) | **`docs`** | markdown lint + links · docs structure checks |
 | [`e2e.yml`](../.github/workflows/e2e.yml) | **`e2e`** | playwright (chromium) |
 | [`schema-drift.yml`](../.github/workflows/schema-drift.yml) | **`schema`** | schema drift (4 gates in one job) |
@@ -31,7 +32,6 @@ They never need changing as the project grows — that is the whole design, and
 
 | Job | Blocks? | Checks | Reproduce locally |
 |---|---|---|---|
-| **preflight (detect project)** | No — always passes | Detects `package.json`, lockfile, tests, `supabase/config.toml`, migrations. Writes a summary table. | — |
 | **lint** | Yes | ESLint, the [import-boundary assertion](../docs/architecture/source-structure.md#import-rules), and Prettier | `npm run lint && npm run lint:boundaries && npm run format:check` |
 | **commit messages** | Yes (PRs only) | commitlint on every commit in the PR, and on the PR title **with the `(#N)` squash suffix** — the header that lands on `main`. Dependabot's commits and titles are skipped | `npx commitlint --from origin/main --to HEAD` |
 | **typecheck** | Yes | `tsc --noEmit`, strict | `npm run typecheck` |
@@ -43,7 +43,8 @@ They never need changing as the project grows — that is the whole design, and
 | **dependency review** | Yes at HIGH, and denied licences | Newly *introduced* vulnerable or copyleft deps | PR-only; no local equivalent |
 | **npm audit** | Yes at HIGH (prod deps only) | Advisories against the lockfile | `npm audit --audit-level=high --omit=dev` |
 | **codeql (javascript-typescript)** | No — reports | Injection, taint flows in our code | Impractical locally |
-| **codeql (actions)** | No — reports | **Workflow injection, over-broad permissions.** Works today. | Impractical locally |
+| **codeql (actions)** | No — reports | **Workflow injection, over-broad permissions.** | Impractical locally |
+| **actionlint (workflows)** | Yes | Every workflow parses and is valid: expression contexts, job references, and shellcheck on every `run:` block. In `security.yml`, so a `ci.yml` that fails to load cannot take this check down with it | `docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7` |
 | **playwright (chromium)** | Yes | Critical-path E2E | `npm run test:e2e` |
 | **schema drift** | Yes | Four gates — see below | `supabase db reset && supabase db diff && supabase test db` |
 | **markdown lint + links** | Yes | markdownlint + relative-link check | `npx markdownlint-cli2 "**/*.md"` and `npx lychee --offline --no-progress .` |
@@ -68,91 +69,45 @@ silently. CI fails the build rather than warning.
 The gate needs **no secrets**: it runs a throwaway local Postgres, so it works
 on fork PRs.
 
-## Why CI is green on an empty repo
+## No gate passes by not running
 
-This repository currently has no `package.json`, no tests, no migrations — and
-all six workflows pass. That is deliberate, not accidental.
+Until [`M0-B08`](../tasks/backlog/m0-foundation.md) the workflows detected what
+the repository contained and **skipped** the jobs whose code did not exist yet,
+and the aggregates counted a skip as a pass. That kept a docs-only repository
+green. Once the code existed, the same mechanism became a way for a gate to go
+green without running — so it is gone:
 
-### 1. Preflight detects what exists
+- **No detection steps.** Every job runs unconditionally. There is no
+  `preflight` job and no `steps.detect` condition left in any workflow.
+- **Jobs run in parallel.** `build` no longer waits for `lint` and
+  `typecheck`; the aggregate fails if any of them fails either way.
+- **Aggregates are strict.** All five use
+  [`require-results`](../.github/actions/require-results/action.yml): every
+  needed job must **succeed**. A skip fails the gate unless the job is named in
+  `allow-skipped` for that run.
 
-A `preflight` job probes the repository and publishes boolean outputs
-(`has_app`, `has_lockfile`, `has_tests`, `has_supabase_config`, …). It always
-succeeds.
+The exceptions, all explicit:
 
-### 2. Code jobs gate on those outputs
+| Job | Skips when | Why |
+|---|---|---|
+| **commit messages** | Push to `main` | A push has no PR commit range or title to check. |
+| **dependency review** | Push to `main` | It compares a PR's dependencies against its base. |
+| **pgTAP RLS isolation tests** (step, inside `schema drift`) | `supabase/tests` has no `.sql` files | The harness lands in [`M1-B03`](../tasks/backlog/m1-auth-and-profile.md), which must delete this skip. |
 
-```yaml
-lint:
-  needs: preflight
-  if: needs.preflight.outputs.has_app == 'true'
-```
+### A workflow that fails to load is silence, not red
 
-With no `package.json`, `lint` is **skipped** — not failed. Standalone
-workflows use `if: hashFiles('package.json') != ''` for the same effect.
+If a workflow file is invalid, GitHub runs **zero** jobs and the aggregate
+posts **no status at all**. In M0-B11, `hashFiles()` in a job-level `if`
+did exactly that: the PR showed 16 green checks and nothing red. Two defences:
 
-### 3. The aggregate gate is the required check
+1. **Branch protection requires the aggregates**
+   ([02-branching.md](02-branching.md)), so a missing `ci` status blocks the
+   merge instead of going unnoticed.
+2. **actionlint runs in `security.yml`**, a different workflow from the ones it
+   most needs to check.
 
-```yaml
-ci:
-  needs: [preflight, lint, typecheck, unit, integration, build]
-  if: always()          # runs even when dependencies were skipped
-  # fails ONLY if some dependency actually failed or was cancelled
-```
-
-**This is the trick that makes the whole thing work.**
-
-Without it, you would have to list `lint`, `typecheck`, and the rest as required
-checks. GitHub treats a *skipped* required check as never-reported, so every PR
-would sit at "Expected — waiting for status" forever. The usual workaround is
-editing branch protection every time a job comes online — tedious and
-error-prone.
-
-The aggregate gate always runs, and:
-
-| Situation | `ci` |
-|---|---|
-| All jobs passed | ✅ green |
-| Some jobs skipped, none failed | ✅ green |
-| Any job failed | ❌ red |
-| Any job cancelled | ❌ red |
-
-So branch protection is configured once and never touched again.
-
-### 4. Some gates do real work today
-
-Not everything skips. Running now, and meaningful:
-
-| Gate | Value today |
-|---|---|
-| **gitleaks** | Scans full history. Meaningful from commit one. |
-| **trivy** (misconfig) | Analyses these workflow files for misconfiguration. |
-| **codeql (actions)** | Lints the workflows for injection and over-broad permissions. |
-| **docs** | Markdown lint, relative links, ADR index, task-ID uniqueness. |
-
-The docs gate is why CI here is green *and* meaningful rather than vacuously
-green.
-
-[`M0-B08`](../tasks/backlog/m0-foundation.md) activates the rest once
-`package.json` lands. No workflow edits required — preflight simply starts
-reporting `true`.
-
-## Reading a skipped job
-
-A grey "Skipped" in the checks list is **expected** while the relevant code does
-not exist. Preflight's step summary prints exactly what was detected and why:
-
-```text
-### Preflight
-| Signal              | Value   |
-|---------------------|---------|
-| App (package.json)  | `false` |
-| Migrations          | `false` |
-
-> No application code yet — code jobs are skipped by design.
-```
-
-A skipped job that *should* have run means preflight's detection is wrong —
-that is a bug in `ci.yml`, not in your branch.
+Check the **number** of checks on a PR, not only their colour. Today a PR
+shows 24 (as of M0-B08).
 
 ## When a gate is red
 
@@ -176,8 +131,8 @@ expiry date, and review):
 | `cancel-in-progress` **on PRs only** | Never cancel a `main` run — those gate deploys and feed the Security tab. |
 | `timeout-minutes` on every job | A hung job cannot burn the budget. |
 | **No `pull_request_target`** | It runs with secrets against untrusted code. |
-| No `paths-ignore` on `ci.yml` / `security.yml` | A path-filtered *required* check never runs on unrelated PRs and blocks the merge button. |
-| `paths-ignore` **is** on `e2e.yml` | Docs PRs — which is all of them right now — should not queue a 20-minute browser job. Safe because `e2e` is not required while the suite is thin. |
+| Aggregates use `require-results` | One strict implementation of "every job succeeded", instead of five copies of a lenient one. |
+| No `paths-ignore` on **any** workflow | Every aggregate is a required check. `e2e.yml` lost its filter in M0-B08; with the browser cache the job takes about three minutes. |
 
 ## Next
 

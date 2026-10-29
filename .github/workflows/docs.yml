@@ -60,7 +60,6 @@ jobs:
         run: |
           set -euo pipefail
           fail=0
-          [ -d docs/adr ] || { echo "No docs/adr yet — skipping."; exit 0; }
           for adr in docs/adr/[0-9]*.md; do
             [ -e "$adr" ] || continue
             base=$(basename "$adr")
@@ -76,7 +75,6 @@ jobs:
         run: |
           set -euo pipefail
           fail=0
-          [ -d tasks/backlog ] || { echo "No tasks/backlog yet — skipping."; exit 0; }
           for f in tasks/backlog/*.md; do
             [ -e "$f" ] || continue
             base=$(basename "$f")
@@ -91,7 +89,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          [ -d tasks/backlog ] || { echo "No tasks/backlog yet — skipping."; exit 0; }
           # Match only task-ROW DEFINITIONS, not every mention.
           #
           # An ID legitimately appears several times in one file: the progress
@@ -119,15 +116,17 @@ jobs:
         run: |
           set -euo pipefail
           fail=0
-          [ -f docs/README.md ] || { echo "No docs/README.md yet — skipping."; exit 0; }
           # Extract relative markdown link targets and confirm each resolves.
-          grep -ohE '\]\(([a-zA-Z0-9_./-]+\.md)' docs/README.md \
-            | sed -E 's/^\]\(//' | sort -u | while read -r target; do
-              if [ ! -f "docs/$target" ] && [ ! -f "$target" ]; then
-                echo "::error file=docs/README.md::linked doc does not exist: $target"
-                fail=1
-              fi
-            done
+          # Process substitution, not a pipe: a `while` on the right of a pipe
+          # runs in a subshell, so `fail=1` never reached this shell and the
+          # step exited 0 with errors printed (fixed in M0-B08).
+          while read -r target; do
+            if [ ! -f "docs/$target" ] && [ ! -f "$target" ]; then
+              echo "::error file=docs/README.md::linked doc does not exist: $target"
+              fail=1
+            fi
+          done < <(grep -ohE '\]\(([a-zA-Z0-9_./-]+\.md)' docs/README.md \
+                     | sed -E 's/^\]\(//' | sort -u)
           exit $fail
 
       - name: Summary
@@ -149,19 +148,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Check results
-        shell: bash
-        env:
-          NEEDS: ${{ toJSON(needs) }}
-        run: |
-          set -euo pipefail
-          # grep exits 1 when it finds nothing, which under `set -e` kills the
-          # script before the comparison — so these gates failed precisely when
-          # NOTHING had failed. `|| true` is load-bearing.
-          failed=$(printf '%s' "$NEEDS" | grep -c '"result": *"failure"' || true)
-          cancelled=$(printf '%s' "$NEEDS" | grep -c '"result": *"cancelled"' || true)
-          if [ "$failed" -gt 0 ] || [ "$cancelled" -gt 0 ]; then
-            echo "::error::A docs gate failed."
-            exit 1
-          fi
-          echo "Docs gates passed."
+      # The action is local, so the checkout is needed to find it.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: ./.github/actions/require-results
+        with:
+          needs: ${{ toJSON(needs) }}
+          failure-hint: "Run npm run lint:md locally; structure checks are shell steps in docs.yml."

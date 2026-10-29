@@ -38,7 +38,7 @@ exits 0 unconditionally is worse than nothing, because it buys false confidence.
 | [x] | M0-B05 | `[M0][BE] Initialize local Supabase` |
 | [x] | M0-B06 | `[M0][BE] Create the three Supabase client factories` |
 | [x] | M0-B07 | `[M0][BE] Wire database type generation` |
-| [ ] | M0-B08 | `[M0][DO] Activate CI jobs now that package.json exists` |
+| [x] | M0-B08 | `[M0][DO] Activate CI jobs now that package.json exists` |
 | [x] | M0-B09 | `[M0][DO] Add Playwright config and a smoke E2E test` |
 | [ ] | M0-B10 | `[M0][DO] Connect the Vercel project and preview deployments` |
 | [x] | M0-B11 | `[M0][DO] Install commit and staged-file hooks` |

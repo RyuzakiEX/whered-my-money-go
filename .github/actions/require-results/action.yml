@@ -1,0 +1,76 @@
+name: Require job results
+description: >
+  The aggregate gate behind every required status check. Fails unless every
+  needed job SUCCEEDED. A skipped job is a failure too, unless it is named in
+  `allow-skipped` — a gate that did not run must never read as a gate that
+  passed (M0-B08, "no aspirational gates").
+
+inputs:
+  needs:
+    description: "`toJSON(needs)` from the calling job."
+    required: true
+  allow-skipped:
+    description: >
+      Space-separated job ids that may legitimately be skipped on THIS run
+      (for example a PR-only job on a push to main). Empty by default.
+    required: false
+    default: ""
+  failure-hint:
+    description: Where to look when the gate fails.
+    required: false
+    default: "See workflow/08-ci-gates.md."
+
+runs:
+  using: composite
+  steps:
+    - name: Check every needed job
+      shell: bash
+      env:
+        NEEDS: ${{ inputs.needs }}
+        ALLOW_SKIPPED: ${{ inputs.allow-skipped }}
+        HINT: ${{ inputs.failure-hint }}
+      run: |
+        set -euo pipefail
+        bad=0
+
+        # A failure inside the process substitution below would not trip
+        # `set -e`, and an empty list would loop zero times and pass. Count
+        # first, here, where a jq error does stop the script.
+        count=$(jq 'length' <<<"$NEEDS")
+        if [ "$count" -lt 1 ]; then
+          echo "::error::No job results to check — the gate would pass vacuously."
+          exit 1
+        fi
+
+        {
+          echo "| Job | Result |"
+          echo "|---|---|"
+        } >> "$GITHUB_STEP_SUMMARY"
+
+        # Process substitution, not a pipe: a `while` on the right of a pipe
+        # runs in a subshell, and `bad=1` would never reach this shell.
+        while read -r job result; do
+          verdict="$result"
+          case "$result" in
+            success) ;;
+            skipped)
+              if [[ " $ALLOW_SKIPPED " == *" $job "* ]]; then
+                verdict="skipped (allowed)"
+              else
+                echo "::error::Job '$job' was skipped. A required gate must run."
+                bad=1
+              fi
+              ;;
+            *)
+              echo "::error::Job '$job' finished with '$result'."
+              bad=1
+              ;;
+          esac
+          echo "| \`$job\` | $verdict |" >> "$GITHUB_STEP_SUMMARY"
+        done < <(jq -r 'to_entries[] | "\(.key) \(.value.result)"' <<<"$NEEDS")
+
+        if [ "$bad" -ne 0 ]; then
+          echo "::error::Aggregate gate failed. $HINT"
+          exit 1
+        fi
+        echo "All required jobs succeeded."

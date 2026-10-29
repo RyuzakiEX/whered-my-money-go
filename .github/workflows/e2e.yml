@@ -1,26 +1,17 @@
-# Playwright end-to-end tests.
+# Playwright end-to-end tests, against a production build and a CI-started
+# Supabase.
 #
-# Separate from ci.yml because it is slow (~10-20 min), needs a browser and a
-# running database, and should not be queued by a documentation change.
-#
-# The paths-ignore filter is safe HERE because `e2e` is not a required status
-# check while the suite is still thin — see workflow/02-branching.md. Do not
-# copy this filter into ci.yml or security.yml: a path-filtered required check
-# never runs on unrelated PRs and blocks the merge button forever.
+# Separate from ci.yml because it needs a browser and a running database.
+# NOT path-filtered (M0-B08): `e2e` is a required status check, and a required
+# check with a `paths` filter never runs on unrelated PRs, so it shows as
+# "expected — waiting for status" and blocks the merge button forever. With
+# the browser cache it costs about three minutes per PR.
 name: e2e
 
 on:
   push:
     branches: [main]
   pull_request:
-    paths-ignore:
-      - "**/*.md"
-      - "docs/**"
-      - "workflow/**"
-      - "tasks/**"
-      - "LICENSE"
-      - ".gitleaks.toml"
-      - ".trivyignore"
   workflow_dispatch:
 
 permissions:
@@ -38,37 +29,18 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - id: detect
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ -f playwright.config.ts ] || [ -f playwright.config.js ]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "No Playwright config yet — E2E activated by M0-B09."
-          fi
-          if [ -f supabase/config.toml ]; then
-            echo "supabase=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "supabase=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - uses: ./.github/actions/setup-node-project
-        if: steps.detect.outputs.run == 'true'
 
       # --- Browsers, cached ---------------------------------------------------
       # Keyed on the exact @playwright/test version: a version bump needs a
       # different browser build, so it must miss the cache.
       - name: Read pinned Playwright version
         id: pw
-        if: steps.detect.outputs.run == 'true'
         shell: bash
         run: echo "version=$(node -p "require('./package.json').devDependencies['@playwright/test']")" >> "$GITHUB_OUTPUT"
 
       - name: Cache Playwright browsers
         id: pw-cache
-        if: steps.detect.outputs.run == 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
@@ -77,37 +49,33 @@ jobs:
       # Chromium only. A cross-browser matrix triples the runtime for a suite
       # whose job is to catch broken flows, not rendering differences.
       - name: Install Playwright browser
-        if: steps.detect.outputs.run == 'true' && steps.pw-cache.outputs.cache-hit != 'true'
+        if: steps.pw-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
 
       # The browser binary is cached; its system libraries are not (they live
       # outside the cache path), so a cache hit still installs those.
       - name: Install Playwright system dependencies
-        if: steps.detect.outputs.run == 'true' && steps.pw-cache.outputs.cache-hit == 'true'
+        if: steps.pw-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
 
       # --- Supabase -----------------------------------------------------------
       # Same pinned CLI as `npx supabase` locally and the ci.yml integration job.
       - name: Read pinned Supabase CLI version
         id: cli
-        if: steps.detect.outputs.run == 'true' && steps.detect.outputs.supabase == 'true'
         shell: bash
         run: echo "version=$(node -p "require('./package.json').devDependencies.supabase")" >> "$GITHUB_OUTPUT"
 
       - uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v1
-        if: steps.detect.outputs.run == 'true' && steps.detect.outputs.supabase == 'true'
         with:
           version: ${{ steps.cli.outputs.version }}
 
       - name: Start local Supabase
-        if: steps.detect.outputs.run == 'true' && steps.detect.outputs.supabase == 'true'
         run: |
           supabase start
           supabase db reset
 
       # The anon key of THIS throwaway stack — public, valid nowhere else.
       - name: Export local anon key
-        if: steps.detect.outputs.run == 'true' && steps.detect.outputs.supabase == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -122,14 +90,12 @@ jobs:
       # E2E tests what ships: build here, and playwright.config.ts starts
       # `npm run start` (not the dev server) when CI is set.
       - name: Build
-        if: steps.detect.outputs.run == 'true'
         run: npm run build
         env:
           NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
           NEXT_PUBLIC_SITE_URL: http://localhost:3000
 
       - name: Run E2E tests
-        if: steps.detect.outputs.run == 'true'
         run: npm run test:e2e
         env:
           NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
@@ -140,7 +106,7 @@ jobs:
       # (test-results/) exist only when something failed or retried, and are
       # the only way to debug a CI-only failure.
       - name: Upload Playwright report
-        if: always() && steps.detect.outputs.run == 'true'
+        if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-report
@@ -151,7 +117,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Stop local Supabase
-        if: always() && steps.detect.outputs.supabase == 'true'
+        if: always()
         run: supabase stop --no-backup || true
 
   e2e-status:
@@ -161,19 +127,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Check results
-        shell: bash
-        env:
-          NEEDS: ${{ toJSON(needs) }}
-        run: |
-          set -euo pipefail
-          # grep exits 1 when it finds nothing, which under `set -e` kills the
-          # script before the comparison — so these gates failed precisely when
-          # NOTHING had failed. `|| true` is load-bearing.
-          failed=$(printf '%s' "$NEEDS" | grep -c '"result": *"failure"' || true)
-          cancelled=$(printf '%s' "$NEEDS" | grep -c '"result": *"cancelled"' || true)
-          if [ "$failed" -gt 0 ] || [ "$cancelled" -gt 0 ]; then
-            echo "::error::E2E tests failed. Download the playwright-report artifact."
-            exit 1
-          fi
-          echo "E2E passed or was skipped."
+      # The action is local, so the checkout is needed to find it.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: ./.github/actions/require-results
+        with:
+          needs: ${{ toJSON(needs) }}
+          failure-hint: "Download the playwright-report artifact; the trace is under test-results/."
