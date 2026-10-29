@@ -9,6 +9,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 import { requireEnv } from '@/lib/server/supabase/env';
+import type { Database } from '@/types/database';
 
 // Runtime control: refuse to load in a browser bundle at all. A thrown import
 // breaks the page loudly instead of shipping the key's call site to a client.
@@ -22,7 +23,7 @@ if (typeof window !== 'undefined') {
 }
 
 export function createAdminClient() {
-  return createClient(
+  return createClient<Database>(
     requireEnv(
       'NEXT_PUBLIC_SUPABASE_URL',
       process.env.NEXT_PUBLIC_SUPABASE_URL,

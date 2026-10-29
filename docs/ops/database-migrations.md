@@ -106,7 +106,7 @@ what makes "migrations are the source of truth" a fact rather than a policy.
 |---|---|---|
 | **1. Replay** | `supabase db reset` applies every migration to an empty database | A migration depending on hand-applied state, or on another migration's side effect |
 | **2. Drift** | `supabase db diff --schema public` is empty | A schema change made outside a migration |
-| **3. Types** | `supabase gen types typescript --local` matches the committed file | A stale `database.types.ts`, which makes TypeScript validate against a schema that no longer exists |
+| **3. Types** | `npm run db:types` (the same generator) leaves the committed file unchanged under `git diff --exit-code` | A stale `database.types.ts`, which makes TypeScript validate against a schema that no longer exists |
 | **4a. RLS on** | Every public table has `relrowsecurity = true` | **A new table shipped without Row Level Security** |
 | **4b. Policies** | Every RLS table has ≥1 policy (warning) | RLS enabled but no policies — fails closed, but almost always a mistake |
 | **4c. Isolation** | `supabase test db` — the pgTAP suite | A policy that exists but does not isolate |

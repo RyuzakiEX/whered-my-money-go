@@ -98,20 +98,29 @@ jobs:
       # --- Gate 3: generated types are current -----------------------------
       # A stale database.types.ts means TypeScript is validating against a
       # schema that no longer exists — type safety that silently lies.
+      #
+      # Runs the SAME script as `npm run db:types` (Node built-ins only, so no
+      # `npm ci` here), then diffs the committed file. One generator, one
+      # comparison: the header and formatting cannot drift between the two.
       - name: Generated types match the schema
         if: steps.detect.outputs.run == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          if [ ! -f types/database.types.ts ]; then
-            echo "No types/database.types.ts yet — skipping (M0-B07 wires this up)."
-            exit 0
+          # `git diff` ignores untracked files, so a deleted-then-regenerated
+          # file would otherwise pass. Require it to be committed.
+          if ! git ls-files --error-unmatch types/database.types.ts > /dev/null 2>&1; then
+            echo "::error::types/database.types.ts is not committed. Run 'npm run db:types' and commit it."
+            exit 1
           fi
-          supabase gen types typescript --local > /tmp/database.types.ts
-          if ! diff -u types/database.types.ts /tmp/database.types.ts > /tmp/types.diff; then
-            echo "::error::Generated types are stale. Run 'npm run db:types' and commit."
+          node scripts/gen-db-types.mjs
+          if ! git diff --exit-code -- types/database.types.ts > /tmp/types.diff; then
+            echo "::error file=types/database.types.ts::Generated types are stale. Run 'npm run db:types' and commit types/database.types.ts."
             {
               echo "### Stale generated types"
+              echo ""
+              echo "The committed \`types/database.types.ts\` does not match the schema the"
+              echo "migrations produce. Run \`npm run db:types\` and commit the result."
               echo ""
               echo '```diff'
               head -n 100 /tmp/types.diff
