@@ -44,7 +44,7 @@ back in seconds.
 
 ```text
 1. Merge.                      All gates green.
-2. Apply migrations.           supabase db push
+2. Apply migrations.           supabase db push --linked
 3. Verify the schema.          RLS on; a smoke query works.
 4. Let Vercel deploy.          Automatic on merge.
 5. Smoke test production.      The affected flow, end to end.
@@ -198,7 +198,7 @@ only for migrations. See
 ```text
 1.  Provision the production Supabase project (region near users).
 2.  supabase link --project-ref <production-ref>
-3.  supabase db push                     — all migrations
+3.  supabase db push --linked            — all migrations
 4.  VERIFY RLS on every table.           Manual. Non-negotiable.
 5.  Seed reference data only.            NO demo data in production.
 6.  Configure Auth: site URL, redirect allowlist, email templates.

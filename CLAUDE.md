@@ -183,8 +183,17 @@ figures a user will act on.
 
 ## Current state
 
-Docs and CI are complete. The app is a scaffold: Next.js with strict
-TypeScript, enforced import boundaries, no features yet.
+M0 (Foundation & Toolchain) is complete: Next.js with strict TypeScript and
+enforced import boundaries, Vitest unit and integration projects, Playwright,
+local Supabase with the three client factories and generated types, the
+shadcn/ui kit and app shell, commit hooks, strict CI aggregates, branch
+protection on `main`, and Vercel previews backed by a separate Supabase preview
+project. There are no product features and no migrations yet.
 
-Progress is in [tasks/milestones.md](tasks/milestones.md). Next up is M0-B04
-(Vitest), which makes the test-baseline step of this workflow executable.
+Every step of the workflow above is now executable, including the test
+baseline. The pgTAP step waits on M1-B03.
+
+Progress is in [tasks/milestones.md](tasks/milestones.md). Next up is M1 (Auth
+& Profile), starting with M1-B01, the first migration. Migrations do not reach
+the preview database automatically: run `npx supabase db push --linked` after
+one merges ([environments.md](docs/ops/environments.md)).

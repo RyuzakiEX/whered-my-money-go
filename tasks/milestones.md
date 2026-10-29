@@ -129,11 +129,11 @@ these are the milestone-level checks.
 
 ### M0 — Foundation & Toolchain
 
-- [ ] `npm run verify` passes locally from a clean clone with no manual steps beyond `npm install` and `supabase start`
-- [ ] Every CI job runs real work — no job is a placeholder or an unconditional `exit 0`
-- [ ] The import-boundary lint fixture importing `lib/server` from `components/` fails lint, proving the rules are enforced and not aspirational
-- [ ] `npm run dev` serves the authenticated shell with all nine sidebar items (spec §25)
-- [ ] Branch protection blocks a direct push to `main`
+- [x] `npm run verify` passes locally from a clean clone with no manual steps beyond `npm install` and `supabase start`
+- [x] Every CI job runs real work — no job is a placeholder or an unconditional `exit 0`
+- [x] The import-boundary lint fixture importing `lib/server` from `components/` fails lint, proving the rules are enforced and not aspirational
+- [x] `npm run dev` serves the authenticated shell with all nine sidebar items (spec §25)
+- [x] Branch protection blocks a direct push to `main`
 
 ### M1 — Auth & Profile
 
