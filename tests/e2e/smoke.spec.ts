@@ -22,7 +22,7 @@ test('/login renders', async ({ page }) => {
 
   expect(response?.status()).toBe(200);
   await expect(
-    page.getByRole('heading', { level: 1, name: 'Log in' }),
+    page.getByRole('heading', { level: 1, name: 'Sign in' }),
   ).toBeVisible();
   await expect(page).toHaveTitle(/Log in/);
 });
