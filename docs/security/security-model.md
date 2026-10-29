@@ -116,7 +116,7 @@ specifically attempts a foreign-account insert and asserts failure (`M3-B04`).
 |---|
 | gitleaks on **full history**, every push and PR — a shallow scan misses the case that matters |
 | Custom rules for `sb_secret_*` and `service_role` JWTs (`.gitleaks.toml`) |
-| `service_role` never a GitHub Actions secret; production-only in Vercel |
+| `service_role` never a GitHub Actions secret, and absent from every Vercel scope — no deployed code path may bypass RLS |
 | `admin.ts` lint-restricted, and throws if bundled client-side |
 | Only `NEXT_PUBLIC_*` reaches the browser — see [below](#public-vs-secret-environment-variables) |
 | Trivy secret scanner as a second opinion |
@@ -211,8 +211,8 @@ is safe to publish. The PR template asks.
 
 | Secret | Stored in | Readable by | Rotation |
 |---|---|---|---|
-| `SUPABASE_SERVICE_ROLE_KEY` | Vercel **production env only** | Production server runtime | Supabase dashboard → redeploy. Rotate immediately on any suspected exposure. |
-| `SUPABASE_DB_URL` | Vercel env; GitHub Actions secret for release jobs | Server runtime; release workflow | Rotate DB password → update both |
+| `SUPABASE_SERVICE_ROLE_KEY` | **Nowhere hosted.** The maintainer's machine, for migration tooling and seed scripts. Absent from every Vercel scope and from GitHub Actions (M0-B10). | Local tooling only | Supabase dashboard → API keys. Rotate immediately on any suspected exposure. |
+| `SUPABASE_DB_URL` | The maintainer's machine; GitHub Actions secret for release jobs. Not in Vercel. | Migration tooling; release workflow | Rotate DB password → update both |
 | `SUPABASE_ACCESS_TOKEN` | GitHub Actions secret | Release workflow only | Revoke and reissue in Supabase account settings |
 | `SUPABASE_PROJECT_ID` | GitHub Actions variable | Release workflow | Not secret; identifier only |
 | Session JWTs | Browser httpOnly cookie | The user's browser | Auto-rotated by refresh |
