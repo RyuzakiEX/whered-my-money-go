@@ -1,6 +1,6 @@
 # Normalize line endings: the dev host is Windows, CI runs Linux.
 # Without this, every file churns between CRLF and LF across machines.
-* text=eol=lf
+* text=auto eol=lf
 
 # Explicit text types
 *.md        text eol=lf diff=markdown
