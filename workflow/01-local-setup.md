@@ -203,7 +203,7 @@ command. See [08-ci-gates.md](08-ci-gates.md) for the job-to-script mapping.
 | `npm run test:coverage` | Unit suite with coverage thresholds enforced |
 | `npm run test:integration` | Integration suite — **needs `npx supabase start`** and the anon key in `.env.local` |
 | `npm run test:e2e` | Playwright E2E *[after M0-B09]* |
-| `npm run db:types` | Regenerate `types/database.types.ts` *[after M0-B07]* |
+| `npm run db:types` | Regenerate `types/database.types.ts` from the local database — **needs `npx supabase start`** |
 | `npm run db:reset` | Replay every migration from empty, then `supabase/seed.sql` |
 | `npm run verify` | Everything above except integration and E2E. **Run before pushing.** |
 
@@ -326,7 +326,7 @@ Regenerate rather than hand-editing. `types/database.types.ts` is generated and
 marked `linguist-generated` for exactly this reason:
 
 ```bash
-npm run db:types      # [available after M0-B07]
+npm run db:types
 ```
 
 If it still disagrees, your local database has drifted from the migrations — run

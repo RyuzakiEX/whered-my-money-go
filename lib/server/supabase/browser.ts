@@ -11,9 +11,10 @@
 import { createBrowserClient } from '@supabase/ssr';
 
 import { requireEnv } from '@/lib/server/supabase/env';
+import type { Database } from '@/types/database';
 
 export function createBrowserSupabaseClient() {
-  return createBrowserClient(
+  return createBrowserClient<Database>(
     requireEnv(
       'NEXT_PUBLIC_SUPABASE_URL',
       process.env.NEXT_PUBLIC_SUPABASE_URL,

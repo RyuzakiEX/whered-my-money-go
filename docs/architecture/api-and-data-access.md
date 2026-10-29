@@ -541,7 +541,7 @@ types before returning. Mandatory, per
 
 ```ts
 // lib/server/mappers/transactions.ts
-import type { Tables } from '@/types/database.types';
+import type { Tables } from '@/types/database';
 import type { Transaction } from '@/lib/core/types';
 
 type Row = Tables<'transactions'>;
