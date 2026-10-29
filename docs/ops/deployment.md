@@ -98,18 +98,70 @@ stays append-only and auditable.
 
 ## Vercel configuration
 
+Live values, recorded in M0-B10. Re-check with the API, not from memory — the
+dashboard and this table drift the moment someone clicks a setting.
+
 | Setting | Value |
 |---|---|
+| Project | `whered-my-money-go` (team `jorges-projects-bfadb832`), Git-linked to `RyuzakiEX/whered-my-money-go` |
 | Framework | Next.js (auto-detected) |
-| Build command | `npm run build` |
+| Build command | `npm run build` — the repository script, so Vercel and CI build identically |
 | Install command | `npm ci` |
-| Node version | Pinned via `.nvmrc` |
+| Node version | `22.x`, from `package.json` `engines` |
 | Production branch | `main` |
-| Preview branches | All |
-| Region | Nearest the Supabase project — cross-region round trips dominate latency |
+| Preview branches | All — every push to a PR branch builds a preview |
+| PR comments | On: the Vercel bot comments the preview URL on each PR |
+| Git fork protection | On: a deployment from a fork's PR waits for a team member to authorize it, so outside code does not build with this project's environment variables unreviewed |
+| Function region | `sin1` (Singapore), the same region as the Supabase preview project — cross-region round trips dominate latency |
+
+**Node comes from `engines`, not `.nvmrc`.** Vercel ignores `.nvmrc` and picks
+the Node major from `package.json` `engines.node`. An open range such as
+`>=22.13.0` would let it build on a newer major than CI tests on, so `engines`
+pins the major (`22.x`) and `.nvmrc` pins the exact version for local and CI.
+Change both together.
 
 Environment variables per environment, scoped so preview never holds production
-credentials: [environments.md](environments.md#environment-variable-matrix).
+credentials, and **no scope holds the `service_role` key**:
+[environments.md](environments.md#environment-variable-matrix).
+
+### URLs
+
+| Environment | URL |
+|---|---|
+| Production | `https://whered-my-money-go.vercel.app` (no custom domain until M9-B06) |
+| Preview, per branch | `https://whered-my-money-go-git-<branch>-jorges-projects-bfadb832.vercel.app` — a stable alias that follows the branch's latest push |
+| Preview, per commit | A unique immutable URL per deployment, posted in the PR comment |
+
+### Deployment protection
+
+| Setting | Value | Effect |
+|---|---|---|
+| Vercel Authentication | `all_except_custom_domains` | Every deployment on a `*.vercel.app` URL — previews **and** the production `.vercel.app` alias — requires signing in to Vercel as a team member. |
+| Password protection | Off | A paid add-on; the team is on the Hobby plan, and Vercel Authentication already covers it. |
+
+While production has no custom domain, the production URL is also behind
+Vercel Authentication — correct while there is no production backend. M9-B06
+adds the custom domain, which is the publicly reachable entry point.
+
+### Promotion path
+
+```text
+push to a PR branch ──► preview deployment (Preview env vars, preview Supabase)
+                              │  CI gates green, PR squash-merged
+                              ▼
+push to main ─────────► production deployment (Production env vars)
+                              │  goes live on the production URL automatically
+                              ▼
+rollback ─────────────► Vercel → Deployments → previous production → "Promote"
+```
+
+A preview build is never promoted to production: it was built with the
+**Preview** environment variables, which point at the preview database.
+Production is always a fresh build of `main`.
+
+**A failing build blocks its deployment.** Vercel runs `npm run build`; a
+non-zero exit marks the deployment `ERROR` and nothing is aliased, so the
+previous good deployment keeps serving. Demonstrated in M0-B10's PR.
 
 ## Performance budgets
 

@@ -16,7 +16,7 @@ install, start local Supabase, configure `.env.local`, and run.**
 
 | Tool | Version | Why this one |
 |---|---|---|
-| Node.js | Active LTS — pinned in `.nvmrc` **[added in M0]** | CI reads `.nvmrc` via `node-version-file`, so the pin is the single source of truth for local and CI alike. Until it exists, [the composite action](../.github/actions/setup-node-project/action.yml) falls back to Node 22. |
+| Node.js | Active LTS — pinned in `.nvmrc` **[added in M0]** | CI reads `.nvmrc` via `node-version-file`, so the pin is the single source of truth for local and CI alike. Until it exists, [the composite action](../.github/actions/setup-node-project/action.yml) falls back to Node 22. Vercel ignores `.nvmrc` and reads the major from `package.json` `engines` (`22.x`) — bump both together ([deployment.md](../docs/ops/deployment.md#vercel-configuration)). |
 | npm | Ships with Node | See [Why npm](#why-npm-and-not-pnpm) below. |
 | Docker Desktop | Current stable | Local Supabase is a set of containers — Postgres, Auth (GoTrue), Storage, Realtime, Kong, Studio. No Docker, no local database. |
 | Supabase CLI | **Pinned in `package.json`** — installed by `npm ci`, run as `npx supabase` | Owns migrations, type generation, and the local stack. It is the schema source of truth ([ADR-0002](../docs/adr/0002-supabase-cli-migrations-as-schema-source-of-truth.md)). Do not install it globally: CI reads the same pin, and config, diffs, and generated types differ between CLI versions. |

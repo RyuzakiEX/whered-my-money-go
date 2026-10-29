@@ -28,18 +28,53 @@ Related: [deployment.md](deployment.md),
 
 ## Environment variable matrix
 
-| Variable | Local | Preview | Production | Secret? |
+What the **app** reads, per environment. Local is `.env.local`; Preview and
+Production are Vercel environment scopes.
+
+| Variable | Local (`.env.local`) | Preview (Vercel) | Production (Vercel) | Secret? |
 |---|---|---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | `http://127.0.0.1:54321` | preview project URL | production project URL | No |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | local fixed demo key | preview anon key | production anon key | No |
-| `NEXT_PUBLIC_SITE_URL` | `http://localhost:3000` | Vercel preview URL | canonical domain | No |
-| `SUPABASE_SERVICE_ROLE_KEY` | local fixed demo key | preview service key | production service key | **Yes** |
-| `SUPABASE_DB_URL` | `postgresql://postgres:postgres@127.0.0.1:54322/postgres` | preview connection string | production connection string | **Yes** |
-| `SUPABASE_PROJECT_ID` | — | preview ref | production ref | No |
+| `NEXT_PUBLIC_SUPABASE_URL` | `http://127.0.0.1:54321` | `https://qvqamjyjjcnvjsflvrsb.supabase.co` | *unset until M9-B06* | No |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | local fixed demo key | preview project's anon key | *unset until M9-B06* | No |
+| `NEXT_PUBLIC_SITE_URL` | `http://localhost:3000` | *unset — nothing reads it yet* | *unset until M9-B06* | No |
+| `SUPABASE_SERVICE_ROLE_KEY` | local fixed demo key | **never set** | **never set** | **Yes** |
+| `SUPABASE_DB_URL` | `postgresql://postgres:postgres@127.0.0.1:54322/postgres` | **never set** | **never set** | **Yes** |
+
+The Vercel **Development** scope is deliberately empty. `vercel env pull`
+writes `.env.local`, and would overwrite the local stack's keys with whatever
+the scope holds; local values come from `npx supabase status` instead.
+
+**The `service_role` key is absent from every Vercel scope** (M0-B10), because
+nothing the app runs at request time may bypass RLS. `admin.ts` is
+lint-restricted to migration tooling and seed scripts, which run locally or in
+CI — never in a deployed function. If a request-path feature seems to need it,
+the RLS policy is wrong ([api-and-data-access.md](../architecture/api-and-data-access.md)).
+`SUPABASE_DB_URL` is likewise a migration-tooling credential and stays out of
+Vercel. Verify with the variable names only, never the values:
+
+```bash
+curl -sS "https://api.vercel.com/v10/projects/$PROJECT_ID/env?teamId=$TEAM_ID" \
+  -H "Authorization: Bearer $VERCEL_TOKEN" \
+  | jq -r '.envs[] | "\(.key)\t\(.target | join(","))"'
+```
+
+The expected output is exactly the Preview rows above. As recorded in M0-B10:
+`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`, both `preview`,
+and nothing else.
 
 `NEXT_PUBLIC_*` variables are compiled into the client bundle and are public
 forever. Anything secret must not carry that prefix — see
 [../security/security-model.md](../security/security-model.md#public-vs-secret-environment-variables).
+
+### Supabase projects
+
+| Environment | Project | Ref | Region | Created |
+|---|---|---|---|---|
+| Preview | `whered-my-money-go-preview` | `qvqamjyjjcnvjsflvrsb` | `ap-southeast-1` (Singapore) | M0-B10 |
+| Production | *not yet provisioned* | — | — | M9-B06 |
+
+Both use the free tier, which allows two active projects per organization —
+exactly one per hosted environment. The preview database password is not stored
+in the repository or in Vercel; it lives with the maintainer.
 
 The local Supabase stack prints the same fixed anon and service keys for every
 developer on earth. They are demo values on a stack that is not
@@ -49,8 +84,9 @@ internet-reachable, which is why `.gitleaks.toml` allowlists them.
 
 | Store | Holds | Does **not** hold |
 |---|---|---|
-| **Vercel** production env | `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_DB_URL` | — |
-| **Vercel** preview env | Preview project's keys | Production keys |
+| **Vercel** production env | Production project's URL and anon key (from M9-B06) | **Any** `service_role` key; `SUPABASE_DB_URL` |
+| **Vercel** preview env | Preview project's URL and anon key | Production values; **any** `service_role` key; `SUPABASE_DB_URL` |
+| **Vercel** development env | Nothing — see above | — |
 | **GitHub Actions secrets** | `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD` (release jobs only) | **Never** the production `service_role` key |
 | **GitHub Actions variables** | `SUPABASE_PROJECT_ID`, build-time placeholder public values | Any secret |
 | **`.env.local`** (gitignored) | Local values | — |
@@ -96,8 +132,11 @@ Two properties to preserve:
 - **Preview data is disposable and seeded.** Never copy production data into
   preview. A convenient copy of real financial records behind a shareable URL
   with no access control is a disclosure waiting to happen.
-- **Preview is publicly reachable.** Anyone with the link can open it, so it
-  must contain nothing real.
+- **Preview must contain nothing real.** Vercel Authentication currently gates
+  every `*.vercel.app` deployment to signed-in team members
+  ([deployment.md](deployment.md#deployment-protection)), but that is a
+  setting one click from off. Treat preview as reachable by anyone with the
+  link.
 
 ## Setting up a new environment
 
@@ -105,11 +144,15 @@ Ordered, because the ordering matters:
 
 ```text
 1. Create the Supabase project (choose the region nearest your users).
-2. Apply migrations:            supabase link --project-ref <ref>
-                                supabase db push
+2. Apply migrations:            npx supabase link --project-ref <ref>
+                                npx supabase db push --linked
+                                (pass --linked explicitly: the CLI warns that
+                                db push will target the LOCAL database by
+                                default in its next major version)
 3. Confirm RLS:                 every public table has RLS enabled.
                                 Do not skip. See docs/architecture/rls-policies.md.
-4. Set Vercel env vars for that environment.
+4. Set Vercel env vars for that environment's scope only. URL and anon key;
+   never the service_role key. Verify with the name-only listing above.
 5. Configure Auth: site URL, redirect allowlist, email templates.
 6. Deploy the app.
 7. Smoke test: sign up → add an account → add a transaction → check the

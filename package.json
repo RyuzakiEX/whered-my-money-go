@@ -5,7 +5,7 @@
   "description": "A simple budgeting app that answers one question: Where'd my money go?",
   "license": "MIT",
   "engines": {
-    "node": ">=22.13.0"
+    "node": "22.x"
   },
   "scripts": {
     "dev": "next dev",
