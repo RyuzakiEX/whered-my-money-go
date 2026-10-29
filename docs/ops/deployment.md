@@ -159,6 +159,17 @@ A preview build is never promoted to production: it was built with the
 **Preview** environment variables, which point at the preview database.
 Production is always a fresh build of `main`.
 
+> [!WARNING]
+> **A new project's first deployment went to production, from a PR branch.**
+> Observed in M0-B10: with the production branch already set to `main`, the
+> very first Git deployment (`feat/m0-b10-vercel`, PR #42) was built with
+> `target: production` and took the `whered-my-money-go.vercel.app` alias.
+> Every later push to that branch built as a preview, as configured. It was
+> harmless here — the Production scope was empty and every `.vercel.app` URL
+> sits behind Vercel Authentication — and the next push to `main` replaced
+> it. When provisioning a new Vercel project, make its first deployment from
+> `main`, and confirm `target` on the first deployment rather than assuming.
+
 **A failing build blocks its deployment.** Vercel runs `npm run build`; a
 non-zero exit marks the deployment `ERROR` and nothing is aliased, so the
 previous good deployment keeps serving. Demonstrated in M0-B10's PR.
