@@ -126,3 +126,5 @@ because its absence is how this category of application fails.
 - Adding an ADR adds a row to [adr/README.md](adr/README.md). Also CI-checked.
 - Markdown lint and relative-link checks run on every PR — reproduce locally
   with `npx markdownlint-cli2 "**/*.md"` and `npx lychee --offline .`
+
+- [Demo: a doc that does not exist](ops/does-not-exist.md)

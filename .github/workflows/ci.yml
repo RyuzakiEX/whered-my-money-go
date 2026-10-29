@@ -92,6 +92,7 @@ jobs:
 
   unit:
     name: unit tests
+    if: false # DEMO: a skipped gate must now fail the aggregate
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
