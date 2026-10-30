@@ -19,6 +19,7 @@ spec §32 brand direction).
 - [Chart isolation](#chart-isolation)
 - [Forms that call a Server Action](#forms-that-call-a-server-action)
 - [Design tokens](#design-tokens)
+- [App icon](#app-icon)
 - [Money formatting](#money-formatting)
 - [Accessibility baseline](#accessibility-baseline)
 - [Brand voice](#brand-voice)
@@ -225,6 +226,28 @@ component.
 
 The palette itself is a brand decision task, not fixed here; the *structure* —
 semantic names, both themes, AA contrast — is.
+
+## App icon
+
+The mark answers the product's question: an open wallet, and a peso coin
+sprouting a wing and leaving it. On a solid money-green tile (the `--income`
+hue) so it reads on light and dark browser tabs alike, and kept to three bold
+shapes so it survives 16px.
+
+| File | Served as | Notes |
+|---|---|---|
+| `app/icon.svg` | `<link rel="icon" type="image/svg+xml">` | The source of truth. Hex colours, not tokens: a favicon cannot read CSS variables |
+| `app/apple-icon.png` | `<link rel="apple-touch-icon">`, 180×180 | iOS needs a PNG and rounds the corners itself, so this is the SVG rendered full-bleed (`rx="0"`) |
+
+Both are Next.js file conventions — no `metadata.icons` entry. The E2E smoke
+test fetches each linked icon and checks its content type, so a broken or
+missing file fails CI.
+
+**Changing the icon:** edit `icon.svg`, check it at 16, 32, and 180px on a light
+and a dark background, then regenerate `apple-icon.png` from a copy with the
+tile's `rx` set to `0` (any headless browser screenshot at 180×180 works; this
+repo's Playwright Chromium is enough). XML comments must not contain `--` —
+one did, and the browser silently refused the whole file.
 
 ## Money formatting
 
