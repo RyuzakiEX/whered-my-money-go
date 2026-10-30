@@ -28,7 +28,7 @@ signpost. The real content is over there.
    `feat(sts): add safe-to-spend breakdown computation`.
 5. **Open a PR** from the template, linking `Closes #42`. Every checklist item
    in the template is there because something went wrong without it once.
-6. **Green CI, then squash merge.** See
+6. **Green CI, then merge** (merge commit; squash is disabled). See
    [workflow/08-ci-gates.md](workflow/08-ci-gates.md) for what each gate checks
    and how to reproduce it locally.
 
