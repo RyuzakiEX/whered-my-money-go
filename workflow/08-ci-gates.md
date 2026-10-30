@@ -46,7 +46,7 @@ aggregate, and the aggregate is what branch protection requires.
 | **codeql (actions)** | No — reports | **Workflow injection, over-broad permissions.** | Impractical locally |
 | **actionlint (workflows)** | Yes | Every workflow parses and is valid: expression contexts, job references, and shellcheck on every `run:` block. In `security.yml`, so a `ci.yml` that fails to load cannot take this check down with it | `docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7` |
 | **playwright (chromium)** | Yes | Critical-path E2E | `npm run test:e2e` |
-| **schema drift** | Yes | Four gates — see below | `supabase db reset && supabase db diff && supabase test db` |
+| **schema drift** | Yes | Four gates — see below | `npm run db:reset && npx supabase db diff --schema public && npm run test:rls` |
 | **markdown lint + links** | Yes | markdownlint + relative-link check | `npx markdownlint-cli2 "**/*.md"` and `npx lychee --offline --no-progress .` |
 | **docs structure checks** | Yes | ADR index complete · backlog files indexed · task IDs unique · `docs/README.md` links resolve | See the job's shell steps |
 
@@ -92,7 +92,6 @@ The exceptions, all explicit:
 |---|---|---|
 | **commit messages** | Push to `main` | A push has no PR commit range or title to check. |
 | **dependency review** | Push to `main` | It compares a PR's dependencies against its base. |
-| **pgTAP RLS isolation tests** (step, inside `schema drift`) | `supabase/tests` has no `.sql` files | The harness lands in [`M1-B03`](../tasks/backlog/m1-auth-and-profile.md), which must delete this skip. |
 
 ### A workflow that fails to load is silence, not red
 

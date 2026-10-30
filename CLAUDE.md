@@ -69,7 +69,7 @@ acceptance criteria in the same PR**, so the doc never contradicts the code.
    npm run test                # unit            [after M0-B04]
    npm run test:integration    # integration     [after M0-B04]
    npm run db:reset                        # schema replays from empty
-   npx supabase test db                    # RLS (pgTAP)   [after M1-B03]
+   npm run test:rls                        # RLS (pgTAP)
    npm audit --audit-level=high --omit=dev
    ```
 
@@ -190,8 +190,8 @@ shadcn/ui kit and app shell, commit hooks, strict CI aggregates, branch
 protection on `main`, and Vercel previews backed by a separate Supabase preview
 project. There are no product features and no migrations yet.
 
-Every step of the workflow above is now executable, including the test
-baseline. The pgTAP step waits on M1-B03.
+Every step of the workflow above is executable, including the test baseline
+and the pgTAP RLS suite ([supabase/tests/rls](supabase/tests/rls/README.md)).
 
 Progress is in [tasks/milestones.md](tasks/milestones.md). Next up is M1 (Auth
 & Profile), starting with M1-B01, the first migration. Migrations do not reach

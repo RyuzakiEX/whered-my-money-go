@@ -18,7 +18,7 @@ exits 0 unconditionally is worse than nothing, because it buys false confidence.
 ## Exit criteria
 
 - [x] `npm run verify` passes from a clean clone after only `npm install` and `supabase start` — *fresh clone of `7df64b6`, `npm ci`, `verify` exit 0 (149 tests); verified in M0-B12*
-- [x] Every CI job runs real work — no placeholders, no unconditional `exit 0` — *M0-B08 (#39); the one conditional skip, pgTAP, is M1-B03's to remove*
+- [x] Every CI job runs real work — no placeholders, no unconditional `exit 0` — *M0-B08 (#39); the one conditional skip, pgTAP, was removed in M1-B03*
 - [x] The deliberate import-boundary violation fixture **fails** lint — *`npm run lint:boundaries`, 6 fixtures, each on its own rule id*
 - [x] `npm run dev` serves the authenticated shell with all nine spec §25 sidebar items and the `+ Add Transaction` CTA — *M0-F02 (#33); breakpoint asserted by `tests/e2e/shell.spec.ts`*
 - [x] `npm run db:types` regenerates `types/database.types.ts` and CI fails when the committed file is stale — *M0-B07 (#31), shown failing in run 40831770069*
