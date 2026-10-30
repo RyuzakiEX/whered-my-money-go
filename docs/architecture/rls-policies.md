@@ -128,12 +128,29 @@ No delete policy: account deletion goes through Supabase Auth, and the
 `on delete cascade` from `auth.users` removes the profile. A user deleting their
 profile row while their auth user survives leaves an unusable account.
 
-Both `using` and `with check` on update, with identical predicates. Omitting
-`with check` is the classic RLS mistake on updates: `using` gates *which rows
-you may target*, `with check` gates *what the row looks like afterwards*. With
-only `using`, a user could `update profiles set id = <someone else's uuid>` —
-they may target their own row, and nothing validates the result. Every update
-policy in this document carries both.
+Both `using` and `with check` on update, with identical predicates. `using`
+gates *which rows you may target*; `with check` gates *what the row looks like
+afterwards*. Every update policy in this document states both, for the reader.
+
+> [!NOTE]
+> **Corrected in M1-B01 by experiment.** This section used to say that omitting
+> `with check` lets a user `update profiles set id = <someone else's uuid>`. In
+> Postgres it does not: an UPDATE policy with no `with check` reuses its
+> `using` expression for the new row. The real hazard is a `with check`
+> **looser** than `using` — `with check (true)`, or a predicate on the wrong
+> column.
+>
+> **The select policy is a second guard — but only for statements that read
+> columns.** Postgres applies SELECT policies to an UPDATE or DELETE that has a
+> `where` or `returning`. So `update … where id = <mine>` with a loose
+> `with check`, or `update … where id = <yours>` with `using (true)`, is still
+> blocked by the select policy. An **unfiltered** `update public.profiles set …`
+> is not: with an update policy of `using (true) with check (true)` it rewrote
+> every user's profile (M1-B03 sabotage run, `UPDATE 2`). Over the API,
+> Supabase's safe-update guard refuses any unfiltered UPDATE or DELETE
+> (`21000 UPDATE requires a WHERE clause`), but SQL inside the database — a
+> function, a trigger, a migration — has no such guard. Hence the reusable
+> assertion attacks both filtered **and** unfiltered.
 
 ### `accounts`
 
@@ -576,6 +593,13 @@ safe" would be exactly backwards.
 ## Profile creation
 
 Profiles are created by a trigger on `auth.users`, never by application code.
+M1-B01 ships the profile half
+(`supabase/migrations/20261030015140_create_profile_on_signup.sql`): currency
+and timezone come from the column defaults, a sign-up `display_name` is taken
+from `raw_user_meta_data` when it fits the length check (otherwise `null`, so
+sign-up never fails on a cosmetic field), and `on conflict (id) do nothing`
+makes a second invocation a no-op. The categories insert below arrives with
+M2's `seed_default_categories` migration.
 
 ```sql
 create function public.handle_new_user()
@@ -585,8 +609,9 @@ security definer
 set search_path = ''
 as $$
 begin
-  insert into public.profiles (id, currency, timezone)
-  values (new.id, 'PHP', 'Asia/Manila');
+  insert into public.profiles (id, display_name)
+  values (new.id, /* trimmed metadata name, or null */)
+  on conflict (id) do nothing;
 
   insert into public.categories (user_id, name, type, color, is_default)
   select new.id, d.name, d.type, d.color, true
