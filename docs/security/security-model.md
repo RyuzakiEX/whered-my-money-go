@@ -109,6 +109,20 @@ specifically attempts a foreign-account insert and asserts failure (`M3-B04`).
 | HTTPS everywhere (platform-enforced) |
 | No token in a URL, log, or error message ([observability.md](../architecture/observability.md#never-log-this)) |
 | Sign-out invalidates server-side |
+| **A stolen session cannot change the password through the app** (M1-B05): `updatePassword` accepts only a session from a password-recovery link in the last hour (`amr` method `otp`, read through the verified `getClaims()`). An ordinary password login is refused |
+| Changing the password revokes every other session's refresh token — Supabase Auth does this itself (verified by test) |
+| `secure_password_change` on (local `config.toml`; preview `security_update_password_require_reauthentication`): Auth refuses a direct password change from a session that is not recent |
+
+**Residual risk, stated plainly.** The anon key is public, so a session token
+can call Auth's `PUT /auth/v1/user` directly, bypassing the app's recovery-only
+rule. `secure_password_change` stops that only for sessions that are *not*
+recent: probed in M1-B05, a freshly created password session changed its
+password through the direct API with the setting on. So a **freshly stolen**
+session can still take an account over. Closing it needs Auth to require the
+current password or a reauthentication nonce for every change — no setting found
+for that as of M1-B05 — or an app-level password-change flow that verifies the
+current password before Auth is called, which a direct call would still skip.
+Revisit with M9's security review.
 
 ### T4 — Secret leakage
 

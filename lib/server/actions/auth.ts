@@ -175,7 +175,37 @@ export async function requestPasswordReset(
   return ok(null);
 }
 
-/** Sets a new password for the signed-in user, e.g. after a recovery link. */
+/** How recent a recovery-link sign-in must be to change the password. */
+const RECOVERY_WINDOW_SECONDS = 3600;
+
+/**
+ * True when the session came from a password-recovery link in the last hour.
+ * Recovery-link sessions carry `amr: [{ method: 'otp' }]`; a password login
+ * carries `method: 'password'` (observed against the local stack, M1-B05).
+ * The MVP has no other OTP sign-in, so `otp` means "came from the link".
+ */
+function isRecentRecovery(
+  amr: readonly (string | { method: string; timestamp: number })[] | undefined,
+): boolean {
+  const now = Math.floor(Date.now() / 1000);
+  return (amr ?? []).some(
+    (entry) =>
+      // A bare string (RFC 8176 form) has no timestamp, so its age cannot be
+      // checked: not accepted.
+      typeof entry !== 'string' &&
+      entry.method === 'otp' &&
+      now - entry.timestamp <= RECOVERY_WINDOW_SECONDS,
+  );
+}
+
+/**
+ * Sets a new password — ONLY from a recent recovery-link session. An ordinary
+ * signed-in session is refused: a stolen cookie or an unattended laptop must
+ * not be enough to take an account over. Auth also revokes the user's other
+ * sessions when the password changes (verified by test), and with
+ * `secure_password_change` it refuses a direct API change from a stale
+ * session, so this check cannot be sidestepped through the public anon key.
+ */
 export async function updatePassword(
   input: unknown,
 ): Promise<ActionResult<never>> {
@@ -184,8 +214,12 @@ export async function updatePassword(
   const requestId = newRequestId();
 
   const supabase = await createServerSupabaseClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) return fail({ kind: 'unauthenticated' });
+  // getClaims verifies the JWT; the session in the cookie is not trusted as-is.
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const claims = claimsData?.claims;
+  if (!claims || !isRecentRecovery(claims.amr)) {
+    return fail({ kind: 'unauthenticated' });
+  }
 
   const { error } = await supabase.auth.updateUser({
     password: parsed.data.password,
@@ -203,7 +237,7 @@ export async function updatePassword(
     requestId,
     action: 'updatePassword',
     outcome: 'success',
-    userId: userData.user.id,
+    userId: claims.sub,
   });
   redirect('/dashboard');
 }

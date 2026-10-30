@@ -224,9 +224,52 @@ describe('updatePassword', () => {
     expect(result).toEqual({ ok: false, error: { kind: 'unauthenticated' } });
   });
 
-  it('changes the password for the signed-in user and lands on the dashboard', async () => {
+  it('refuses an ordinary signed-in session: changing a password needs a recovery link', async () => {
+    // A stolen session cookie or an unattended laptop must not be enough to
+    // take the account over by changing its password.
     const user = await createUser({ confirmed: true });
     await redirectOf(() => actions.signIn({ email: user.email, password }));
+
+    const result = await actions.updatePassword({
+      password: 'newpass99',
+      confirmPassword: 'newpass99',
+    });
+    expect(result).toEqual({ ok: false, error: { kind: 'unauthenticated' } });
+
+    // The old password still works.
+    jar.clear();
+    await redirectOf(() => actions.signIn({ email: user.email, password }));
+    expect(await sessionUserId()).toBe(user.id);
+  });
+
+  it('changes the password from a recovery session and signs out every other session', async () => {
+    const user = await createUser({ confirmed: true });
+
+    // Another device, signed in before the reset.
+    const { createClient } = await import('@supabase/supabase-js');
+    const otherDevice = createClient(
+      process.env['NEXT_PUBLIC_SUPABASE_URL'] ?? 'http://127.0.0.1:54321',
+      process.env['NEXT_PUBLIC_SUPABASE_ANON_KEY'] ?? '',
+      { auth: { persistSession: false, autoRefreshToken: false } },
+    );
+    const other = await otherDevice.auth.signInWithPassword({
+      email: user.email,
+      password,
+    });
+    expect(other.error).toBeNull();
+
+    // The recovery link, as the email would carry it, verified into a session.
+    const link = await admin.auth.admin.generateLink({
+      type: 'recovery',
+      email: user.email,
+    });
+    if (link.error) throw link.error;
+    const client = await createServerSupabaseClient();
+    const verified = await client.auth.verifyOtp({
+      type: 'recovery',
+      token_hash: link.data.properties.hashed_token,
+    });
+    expect(verified.error).toBeNull();
 
     const to = await redirectOf(() =>
       actions.updatePassword({
@@ -236,6 +279,11 @@ describe('updatePassword', () => {
     );
     expect(to).toBe('/dashboard');
 
+    // The other device can no longer refresh its session.
+    const refreshed = await otherDevice.auth.refreshSession();
+    expect(refreshed.error).not.toBeNull();
+
+    // And the new password is the one that works.
     jar.clear();
     await redirectOf(() =>
       actions.signIn({ email: user.email, password: 'newpass99' }),
