@@ -9,7 +9,25 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
  * plain functions returning JSX, so they render here without a Next server.
  */
 
-vi.mock('next/navigation', () => ({ usePathname: () => '/dashboard' }));
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/dashboard',
+  redirect: (to: string) => {
+    throw new Error(`redirect ${to}`);
+  },
+}));
+// The layout reads the profile and passes the sign-out action down (M1-F04).
+vi.mock('@/lib/server/queries/profile', () => ({
+  getProfile: () =>
+    Promise.resolve({
+      id: 'u-1',
+      email: 'ana@example.test',
+      displayName: 'Ana',
+      currency: 'PHP',
+      timezone: 'Asia/Manila',
+    }),
+  displayNameOf: (p: { displayName: string | null }) => p.displayName ?? 'You',
+}));
+vi.mock('@/lib/server/actions/auth', () => ({ signOut: vi.fn() }));
 
 afterEach(cleanup);
 
@@ -43,11 +61,8 @@ describe('placeholder routes', () => {
 describe('app shell layout', () => {
   async function renderShell() {
     const { default: AppLayout } = await import('@/app/(app)/layout');
-    return render(
-      <AppLayout>
-        <h1>Dashboard</h1>
-      </AppLayout>,
-    );
+    // An async Server Component: call it for its JSX, then render that.
+    return render(await AppLayout({ children: <h1>Dashboard</h1> }));
   }
 
   it('renders the page inside a single <main>', async () => {

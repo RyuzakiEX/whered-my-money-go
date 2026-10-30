@@ -20,8 +20,8 @@ messages** that never reveal whether an email is registered, and the rule that
 - [x] The reusable "table is user-isolated" pgTAP assertion exists, is documented, and is used by the `profiles` test — *M1-B03 (#48); `supabase/tests/rls/README.md`*
 - [ ] Every auth failure path returns a uniform message that does not leak account existence — *sign-in and reset: done in M1-B05. Sign-up cannot be uniform while email confirmation is off; see security-model.md T7*
 - [x] Unauthenticated `(app)/**` redirects to `/login?next=…`; authenticated `(auth)/**` redirects to `/dashboard`; both have integration tests — *M1-B06; `tests/integration/proxy.test.ts`*
-- [ ] A user can change their display name, currency, and timezone and the change survives a reload
-- [ ] All auth pages are axe-clean and keyboard-navigable
+- [x] A user can change their display name, currency, and timezone and the change survives a reload — *M1-F05; `tests/e2e/account-settings.spec.ts`*
+- [x] All auth pages are axe-clean and keyboard-navigable — *M1-F01..F03, 1280px and 360px, `@axe-core/playwright`*
 
 ## Progress
 
@@ -37,8 +37,8 @@ messages** that never reveal whether an email is registered, and the rule that
 | [x] | M1-F01 | `[M1][FE] Build the sign-up page` |
 | [x] | M1-F02 | `[M1][FE] Build the login page` |
 | [x] | M1-F03 | `[M1][FE] Build the password reset pages` |
-| [ ] | M1-F04 | `[M1][FE] Build the account menu with logout` |
-| [ ] | M1-F05 | `[M1][FE] Build the Settings > Profile screen` |
+| [x] | M1-F04 | `[M1][FE] Build the account menu with logout` |
+| [x] | M1-F05 | `[M1][FE] Build the Settings > Profile screen` |
 | [ ] | M1-B08 | `[M1][DO] Add the auth happy-path E2E test` |
 
 ## Tasks
