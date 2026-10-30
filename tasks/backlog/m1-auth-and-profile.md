@@ -14,7 +14,7 @@ messages** that never reveal whether an email is registered, and the rule that
 
 ## Exit criteria
 
-- [ ] Sign up → dashboard → log out → log back in works against local Supabase and a preview deployment
+- [ ] Sign up → dashboard → log out → log back in works against local Supabase and a preview deployment — *local: M1-B08's `tests/e2e/auth.spec.ts`, three consecutive passes. Preview: blocked while the preview project requires email confirmation — the maintainer's decision (docs/ops/environments.md)*
 - [x] A `profiles` row is created automatically on `auth.users` insert with currency `PHP` and timezone `Asia/Manila` — *M1-B01 (#46); tested locally and on the preview database*
 - [x] `profiles` has RLS with a passing pgTAP isolation test — *M1-B02/B03 (#46, #48); 17/17 in CI*
 - [x] The reusable "table is user-isolated" pgTAP assertion exists, is documented, and is used by the `profiles` test — *M1-B03 (#48); `supabase/tests/rls/README.md`*
@@ -39,7 +39,7 @@ messages** that never reveal whether an email is registered, and the rule that
 | [x] | M1-F03 | `[M1][FE] Build the password reset pages` |
 | [x] | M1-F04 | `[M1][FE] Build the account menu with logout` |
 | [x] | M1-F05 | `[M1][FE] Build the Settings > Profile screen` |
-| [ ] | M1-B08 | `[M1][DO] Add the auth happy-path E2E test` |
+| [x] | M1-B08 | `[M1][DO] Add the auth happy-path E2E test` |
 
 ## Tasks
 
