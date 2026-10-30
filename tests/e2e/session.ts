@@ -21,10 +21,7 @@ try {
   // No .env.local — fine in CI.
 }
 
-export async function signInAsNewUser(
-  context: BrowserContext,
-  baseURL: string,
-): Promise<{ email: string; password: string }> {
+function supabaseWithJar(jar: Map<string, string>) {
   const url =
     process.env['NEXT_PUBLIC_SUPABASE_URL'] ?? 'http://127.0.0.1:54321';
   const anonKey = process.env['NEXT_PUBLIC_SUPABASE_ANON_KEY'] ?? '';
@@ -33,9 +30,7 @@ export async function signInAsNewUser(
       'NEXT_PUBLIC_SUPABASE_ANON_KEY is not set. See workflow/01-local-setup.md.',
     );
   }
-
-  const jar = new Map<string, string>();
-  const supabase = createServerClient(url, anonKey, {
+  return createServerClient(url, anonKey, {
     cookies: {
       getAll: () => [...jar].map(([name, value]) => ({ name, value })),
       setAll: (cookies) => {
@@ -43,13 +38,29 @@ export async function signInAsNewUser(
       },
     },
   });
+}
 
+/** A brand-new account, with no browser session — for tests of logging in. */
+export async function createUser(): Promise<{
+  email: string;
+  password: string;
+  jar: Map<string, string>;
+}> {
+  const jar = new Map<string, string>();
   const email = `e2e-${randomUUID()}@example.test`;
   const password = `Pw-${randomUUID()}`;
-  const { error } = await supabase.auth.signUp({ email, password });
+  const { error } = await supabaseWithJar(jar).auth.signUp({ email, password });
   if (error)
     throw new Error(`E2E sign-up failed: ${error.code ?? error.message}`);
+  return { email, password, jar };
+}
 
+/** A brand-new account, signed in in this browser context. */
+export async function signInAsNewUser(
+  context: BrowserContext,
+  baseURL: string,
+): Promise<{ email: string; password: string }> {
+  const { email, password, jar } = await createUser();
   await context.addCookies(
     [...jar].map(([name, value]) => ({ name, value, url: baseURL })),
   );
