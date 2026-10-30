@@ -153,7 +153,11 @@ Ordered, because the ordering matters:
                                 Do not skip. See docs/architecture/rls-policies.md.
 4. Set Vercel env vars for that environment's scope only. URL and anon key;
    never the service_role key. Verify with the name-only listing above.
-5. Configure Auth: site URL, redirect allowlist, email templates.
+5. Configure Auth: site URL, redirect allowlist, email templates, and the
+   password rule — minimum length 8, "letters and digits" — to match
+   supabase/config.toml and lib/validation/auth.ts. The anon key is public, so
+   Auth must refuse a weak password itself; the form's schema is bypassable.
+   (Preview: still at Supabase's defaults; set with M1-B05's Auth config.)
 6. Deploy the app.
 7. Smoke test: sign up → add an account → add a transaction → check the
    dashboard → verify Safe to Spend computes.

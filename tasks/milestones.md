@@ -18,7 +18,7 @@ cannot be demonstrated, it was scoped wrong.
 | ID | Milestone | | Tasks | | Status |
 |---|---|---|---|---|---|
 | **M0** | [Foundation & Toolchain](backlog/m0-foundation.md) | `██████████` | 14/14 | 100% | done |
-| **M1** | [Auth & Profile](backlog/m1-auth-and-profile.md) | `░░░░░░░░░░` | 0/13 | 0% | not started |
+| **M1** | [Auth & Profile](backlog/m1-auth-and-profile.md) | `█░░░░░░░░░` | 1/13 | 8% | in progress |
 | **M2** | [Accounts](backlog/m2-accounts.md) | `░░░░░░░░░░` | 0/11 | 0% | not started |
 | **M3** | [Transactions & Categories](backlog/m3-transactions-and-categories.md) | `░░░░░░░░░░` | 0/15 | 0% | not started |
 | **M4** | [Dashboard Core](backlog/m4-dashboard-core.md) | `░░░░░░░░░░` | 0/10 | 0% | not started |
@@ -27,7 +27,7 @@ cannot be demonstrated, it was scoped wrong.
 | **M7** | [Safe to Spend ⭐](backlog/m7-safe-to-spend.md) | `░░░░░░░░░░` | 0/10 | 0% | not started |
 | **M8** | [Money Timeline ⭐](backlog/m8-money-timeline.md) | `░░░░░░░░░░` | 0/13 | 0% | not started |
 | **M9** | [MVP Hardening & Launch](backlog/m9-mvp-hardening-and-launch.md) | `░░░░░░░░░░` | 0/10 | 0% | not started |
-| | **MVP total** | `█░░░░░░░░░` | **14/116** | **12%** | |
+| | **MVP total** | `█░░░░░░░░░` | **15/116** | **13%** | |
 
 ## Contents
 
