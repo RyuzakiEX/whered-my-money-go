@@ -28,7 +28,7 @@ Related: [system-architecture.md](system-architecture.md),
 | **Derived figures** | Computed in `lib/core` on the server, cached by tag | Safe to Spend, timeline, budget progress |
 | **View state** | URL search params | Active filters, date range, timeline horizon, page cursor |
 | **Ephemeral UI state** | Local `useState` in the owning Client Component | Dialog open, dropdown focus, form draft |
-| **Session** | httpOnly cookie, refreshed by `middleware.ts` | Supabase JWT |
+| **Session** | httpOnly cookie, refreshed by `proxy.ts` | Supabase JWT |
 | **Per-viewer preference** | `localStorage`, read defensively | Collapsed sidebar, last-used account |
 
 The ordering matters: **push state as far up this table as it will go.** Domain

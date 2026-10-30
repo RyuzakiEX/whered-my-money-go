@@ -105,7 +105,7 @@ specifically attempts a foreign-account insert and asserts failure (`M3-B04`).
 | Mitigation |
 |---|
 | `httpOnly`, `Secure`, `SameSite=Lax` cookies — not readable by JavaScript |
-| Short-lived JWT with refresh, rotated by `middleware.ts` |
+| Short-lived JWT with refresh, rotated by `proxy.ts` (M1-B06) |
 | HTTPS everywhere (platform-enforced) |
 | No token in a URL, log, or error message ([observability.md](../architecture/observability.md#never-log-this)) |
 | Sign-out invalidates server-side |

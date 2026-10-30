@@ -12,7 +12,7 @@
         ┌───────────────────▼───────────────────────┐
         │  Vercel — Next.js App Router              │
         │                                           │
-        │  middleware.ts     session refresh, guards │
+        │  proxy.ts          session refresh, guards │
         │        │                                   │
         │  Server Components ──▶ lib/server/queries  │
         │  Server Actions   ──▶ lib/server/actions   │
