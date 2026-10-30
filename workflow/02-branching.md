@@ -1,8 +1,8 @@
 # Branching
 
 **Trunk-based: `main` is always deployable and protected, every change arrives
-through one short-lived branch and one squash-merged PR, and branches are
-updated by rebase, never by merging `main` in.**
+through one short-lived branch and one PR landed as a merge commit, and every
+commit on that branch is one you are happy to keep on `main` forever.**
 
 There is exactly one long-lived branch. Everything else lives hours to a couple
 of days. That is not a stylistic preference — `main` auto-deploys to Vercel
@@ -53,28 +53,29 @@ git switch -c feat/42-safe-to-spend-card
 shouldn't be there, and you want to know that now rather than discover it in a
 merge commit later.
 
-**Rebase to update. Do not merge `main` into your branch.**
+**Every commit on the branch lands on `main`.** PRs merge with a merge commit
+(below), so nothing is collapsed at merge time. Before you push, each commit
+must be one you would keep: a clean conventional message, and no deliberately
+broken state. A demonstration that needs a failing build or a red gate goes on
+a **throwaway branch** that is never merged.
+
+**Before the PR is open, tidy freely; after, update by merging.** While the
+branch is local only, rebase onto `origin/main` and reshape commits as you
+like. Once it is pushed and under review, bring in `main` with GitHub's
+**Update branch** button or:
 
 ```bash
 git fetch origin
-git rebase origin/main
-# resolve, then:
-git push --force-with-lease
+git merge origin/main
+git push
 ```
 
-Rebasing keeps the branch a clean linear series of your commits, which is what
-makes self-review of the diff meaningful — a merge commit in the middle turns
-"what did I change?" into a three-way question. It also matches the
-linear-history protection rule below, and `--force-with-lease` is what makes the
-force-push safe: it refuses if the remote moved under you.
-
-Since every PR is squash-merged, the intermediate history is collapsed at merge
-time anyway. Rebase conflicts are therefore cheap: you are conflicting with
-`main` once, on a small branch, rather than accumulating merge commits that
-obscure the diff.
+That needs no force-push, so the PR's history and its review comments stay
+anchored. The resulting merge-from-`main` commits are why `main`'s history is
+read with `git log --first-parent main`: one line per PR, each the PR title.
 
 **Delete after merge.** GitHub's "automatically delete head branches" setting
-handles this; if you merged from the CLI, `gh pr merge --squash --delete-branch`
+handles this; if you merged from the CLI, `gh pr merge --merge --delete-branch`
 does both. A branch list that only contains live work is a status report. One
 that contains three months of merged branches is noise.
 
@@ -93,7 +94,7 @@ enforces this mechanically anyway.
 
 Configured in **M0-B12** as the repository **ruleset `main`** (Settings → Rules
 → Rulesets), targeting the default branch, plus Settings → General → Pull
-Requests. Last verified 2026-10-29.
+Requests. Last verified 2026-10-30, after the switch to merge commits.
 
 | Setting | Value | Notes |
 |---|---|---|
@@ -104,13 +105,13 @@ Requests. Last verified 2026-10-29.
 | Required approving reviews | ⚠️ **0** — deviation | The backlog asks for 1. GitHub does not let you approve your own PR, so on a solo repo 1 blocks every merge. **Set it to 1 in the same change that adds a second maintainer.** |
 | Dismiss stale approvals on new commits | ✅ on | No effect at 0 approvals; already correct for when that changes. |
 | Require conversation resolution | ✅ on | Even solo: an unresolved thread on your own PR is a note-to-self you'd otherwise merge past. |
-| Require linear history | ✅ on | Squash-only already produces it; this makes an accidental merge commit impossible. |
+| Require linear history | ❌ **off** — deviation | Merge commits are non-linear by definition. Turned off 2026-10-30 with the switch below. |
 | Block force pushes | ✅ on | |
 | Block deletion | ✅ on | |
 | Require review from Code Owners | ❌ off | **Off while solo** — see below. |
-| Allowed merge methods | **squash only** | Merge commits and rebase merging disabled in the ruleset *and* the repository settings. |
-| Squash commit title | **PR title** | So `main`'s history is the PR titles — which CI lints with the `(#N)` suffix ([03-commits.md](03-commits.md)). |
-| Squash commit message | Commit messages | Keeps each commit's *why* in `main`'s log. |
+| Allowed merge methods | **merge commit only** — deviation | Squash and rebase merging disabled in the ruleset *and* the repository settings. The backlog asked for squash only; the maintainer chose merge commits on 2026-10-30 so each PR's individual commits are kept on `main`. |
+| Merge commit title | **PR title** | GitHub appends `(#N)`, so `git log --first-parent main` reads as the PR titles — which CI lints with that suffix ([03-commits.md](03-commits.md)). |
+| Merge commit message | **Blank** | The PR's own commits carry the *why*; repeating the PR description in the merge commit duplicates it. |
 | Delete head branch on merge | ✅ on | |
 
 Print the live configuration:
@@ -118,7 +119,7 @@ Print the live configuration:
 ```bash
 gh api repos/RyuzakiEX/whered-my-money-go/rules/branches/main
 gh api repos/RyuzakiEX/whered-my-money-go \
-  -q '{allow_squash_merge, allow_merge_commit, allow_rebase_merge, squash_merge_commit_title}'
+  -q '{allow_merge_commit, allow_squash_merge, allow_rebase_merge, merge_commit_title, merge_commit_message}'
 ```
 
 ### Why the aggregates, and why they never sit pending

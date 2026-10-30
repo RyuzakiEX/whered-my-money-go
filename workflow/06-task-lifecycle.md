@@ -1,6 +1,6 @@
 # Task Lifecycle
 
-**Issue → branch → test → commits → PR → green → squash.** The commands, in
+**Issue → branch → test → commits → PR → green → merge.** The commands, in
 order.
 
 > [!NOTE]
@@ -137,19 +137,20 @@ issue, a test that asserts nothing.
 
 On a solo project this is the review. Ten minutes.
 
-## 9. Green, then squash merge
+## 9. Green, then merge
 
 ```bash
 gh pr checks --watch
-gh pr merge --squash --delete-branch
+gh pr merge --merge --delete-branch
 ```
 
 Required gates: `ci`, `security`, `docs`, and `schema` where applicable. Do not
 merge red; do not disable a gate
 ([04-pull-requests.md](04-pull-requests.md#when-ci-is-red)).
 
-The PR title becomes the commit on `main`, so it must be a valid conventional
-commit. The branch deletes; `Closes #42` closes the issue.
+The PR title becomes the merge commit's title on `main`, so it must be a valid
+conventional commit. The branch's commits land too — see
+[02-branching.md](02-branching.md#rules). The branch deletes; `Closes #42` closes the issue.
 
 ## The scope rule
 

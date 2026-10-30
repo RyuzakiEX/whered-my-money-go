@@ -33,7 +33,7 @@ aggregate, and the aggregate is what branch protection requires.
 | Job | Blocks? | Checks | Reproduce locally |
 |---|---|---|---|
 | **lint** | Yes | ESLint, the [import-boundary assertion](../docs/architecture/source-structure.md#import-rules), and Prettier | `npm run lint && npm run lint:boundaries && npm run format:check` |
-| **commit messages** | Yes (PRs only) | commitlint on every commit in the PR, and on the PR title **with the `(#N)` squash suffix** — the header that lands on `main`. Dependabot's commits and titles are skipped | `npx commitlint --from origin/main --to HEAD` |
+| **commit messages** | Yes (PRs only) | commitlint on every commit in the PR, and on the PR title **with the `(#N)` suffix** — the merge commit's header on `main`. Dependabot's commits and titles are skipped | `npx commitlint --from origin/main --to HEAD` |
 | **typecheck** | Yes | `tsc --noEmit`, strict | `npm run typecheck` |
 | **unit tests** | Yes | Vitest + coverage thresholds | `npm run test -- --coverage` |
 | **integration tests** | Yes | Vitest against a local Supabase | `supabase start && npm run test:integration` |

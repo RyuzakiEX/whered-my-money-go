@@ -1,8 +1,9 @@
 # Commits
 
 **Format:** [Conventional Commits](https://www.conventionalcommits.org/). The PR
-title must be one too, because squash-merging makes it the commit message on
-`main`.
+title must be one too, because it becomes the title of the merge commit on
+`main` — and, with merge commits, every commit on the branch reaches `main` as
+well.
 
 Enforced by `commitlint` ([`commitlint.config.mjs`](../commitlint.config.mjs))
 in two places: a local `commit-msg` hook, and the **commit messages** CI job,
@@ -75,7 +76,7 @@ scope is how you reconstruct a feature's history later.
 | Rule | Why |
 |---|---|
 | **Imperative mood** — "add", not "added" or "adds" | Matches `git revert`/`git merge`'s own generated messages |
-| **Subject ≤ 72 characters** — the whole header | Longer truncates in `git log --oneline` and GitHub's UI. **Squash merge appends `(#N)`**, so keep PR titles to about 65; CI lints the title *with* that suffix |
+| **Subject ≤ 72 characters** — the whole header | Longer truncates in `git log --oneline` and GitHub's UI. **The merge commit title appends `(#N)`**, so keep PR titles to about 65; CI lints the title *with* that suffix |
 | **No trailing period** | It is a title, not a sentence |
 | **Lowercase after the colon** | Consistency; the type already capitalises the line visually |
 | **Body explains *why*** | The diff already shows what. The reasoning is the part that gets lost |
@@ -85,7 +86,7 @@ scope is how you reconstruct a feature's history later.
 ### `Refs` on commits, `Closes` on the PR
 
 `Closes #42` in an intermediate commit closes the issue the moment that commit
-reaches `main` — which, with squash merge, is when the whole PR lands anyway.
+reaches `main` — which, since PRs land whole, is when the whole PR lands anyway.
 But if the branch is ever partially cherry-picked, or the PR is split, the issue
 closes while work remains.
 
@@ -129,9 +130,10 @@ That reads as a story, and each commit is independently revertible. The
 test-first ordering is deliberate for `lib/core` — see
 [06-task-lifecycle.md](06-task-lifecycle.md).
 
-Avoid: `wip`, `fix typo`, `address review comments`, `more changes`. Squash
-merge collapses them anyway, but they are noise in review, and review is where
-they cost something. Rebase to tidy before pushing.
+Avoid: `wip`, `fix typo`, `address review comments`, `more changes`. Nothing
+collapses them: with merge commits, every commit on the branch is on `main`
+forever. Tidy with a rebase **before the first push**; after that, a fix-up is a
+normal, well-named commit.
 
 ## AI-assisted commits
 

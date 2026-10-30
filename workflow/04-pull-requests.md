@@ -1,6 +1,6 @@
 # Pull Requests
 
-**One issue, one branch, one PR, squash-merged.** The PR is the unit of
+**One issue, one branch, one PR, landed as a merge commit.** The PR is the unit of
 completion — it is where `Closes #N` lives, where CI gates apply, and where the
 [Definition of Done](07-definition-of-ready-and-done.md) is checked.
 
@@ -124,16 +124,20 @@ that shouldn't be enforced.
 
 ## Merge
 
-**Squash merge only.**
+**Merge commit only** (the maintainer's choice, 2026-10-30; squash and rebase
+are disabled).
 
-- One commit per PR on `main` — history reads as a list of completed changes,
-  and `git bisect` lands on something meaningful.
-- The **PR title becomes the commit message**, so it must be a valid
-  [conventional commit](03-commits.md).
+- One merge commit per PR on `main`, titled with the **PR title** plus
+  `(#N)`, so the title must be a valid [conventional commit](03-commits.md).
+  `git log --first-parent main` reads as the list of completed PRs.
+- The branch's own commits land too, so each must stand on its own: a clean
+  message, and never a deliberately broken state.
+- `git bisect --first-parent` steps PR by PR, landing only on merged, green
+  states; plain `git bisect` can then narrow within a PR.
 - Branch deletes automatically. Issue closes via `Closes #N`.
 
-Never merge-commit (noise) and never rebase-merge (the intermediate `wip`
-commits reach `main`).
+Never rebase-merge: it rewrites the commits, so the SHAs CI tested are not the
+ones on `main`.
 
 ## When CI is red
 
