@@ -102,7 +102,7 @@ For schema changes:
 ```bash
 supabase db reset       # [after M0] — replays every migration from empty
 npm run db:types        # regenerate, and COMMIT the result
-supabase test db        # pgTAP RLS isolation tests
+npm run test:rls        # pgTAP RLS isolation tests
 ```
 
 Available **today**, on docs and CI changes:

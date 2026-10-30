@@ -187,15 +187,11 @@ jobs:
           fi
 
       # --- Gate 4c: pgTAP isolation tests ----------------------------------
+      # Unconditional since M1-B03. The old "skip when there are no tests"
+      # would let deleting every RLS test pass silently. --local is explicit:
+      # tests create users, and must never run against a linked project.
       - name: pgTAP RLS isolation tests
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ ! -d supabase/tests ] || [ -z "$(find supabase/tests -name '*.sql' -print 2>/dev/null | head -n1)" ]; then
-            echo "No pgTAP tests yet — the harness lands in M1-B03."
-            exit 0
-          fi
-          supabase test db
+        run: supabase test db --local
 
       - name: Stop local Supabase
         if: always()
