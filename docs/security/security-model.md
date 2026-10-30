@@ -145,8 +145,33 @@ ignored. See
 *Probing which emails have accounts, via sign-up or password-reset responses.*
 
 Mitigation: **uniform responses.** "If that email has an account, we've sent a
-link" regardless. Identical timing and identical wording for sign-in failures
-whether the email exists or the password was wrong (`M1-B05`).
+link" regardless. Identical wording for sign-in failures whether the email
+exists or the password was wrong (`M1-B05`).
+
+As built in M1-B05 (`lib/server/actions/auth.ts`):
+
+| Path | Uniform? | Evidence |
+|---|---|---|
+| Sign-in | **Yes.** Wrong password, unknown email, and unconfirmed account return byte-identical envelopes | Integration test. Raw Auth answers the unconfirmed case differently (`email_not_confirmed`), which is exactly what the mapping hides |
+| Password reset | **Yes.** `{ ok: true }` whether or not the account exists | Integration test, plus Mailpit showing the real account did get the email |
+| Sign-up | **No, by nature** | With email confirmation off, signing up with a registered email fails while a new one succeeds. No wording hides that. The fix is email confirmation (Auth then answers both alike); deciding it for production is M9's |
+| Timing | **Not verified** | Auth may answer an unknown email faster than a wrong password. Not measured; mitigated, not closed, by the rate limits below |
+
+**Rate limiting posture (M1-B05).** No app-level limiter in the MVP; the
+credential endpoints rely on Supabase Auth's own per-IP limits. Values, from
+`supabase/config.toml` (local) and the preview project's Auth config (2026-10-30):
+
+| Limit | Value | Window |
+|---|---|---|
+| Sign-ups and sign-ins | 30 | 5 minutes, per IP |
+| Token verifications (OTP, magic link, recovery) | 30 | 5 minutes, per IP |
+| Token refreshes | 150 | 5 minutes, per IP |
+| Emails sent (reset, confirmation) | 2 | per hour, project-wide — only enforced with real SMTP, so not locally (Mailpit) |
+
+A limit hit returns `{ kind: 'rate_limited' }`. It is per-IP, not per-account,
+so reporting it reveals nothing about which emails exist. An app-level limiter
+(per-account lockout, CAPTCHA) is a post-MVP decision; Supabase supports
+`[auth.captcha]` when needed.
 
 ### T8 — Denial of service via expensive computation
 
