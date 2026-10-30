@@ -162,8 +162,11 @@ Algorithm, in order:
 ```text
 1. Trim. Normalize Unicode spaces (U+00A0, U+202F, U+2009) to nothing.
 2. Strip the currency symbol and ISO code for the PROFILE currency only.
-   An unrecognized symbol is an error, not something to strip — see
-   "Mixed currency is an error".
+   Any other currency's marker — another supported currency's or an
+   unsupported one — is an error, not something to strip — see
+   "Mixed currency is an error". A foreign marker that sits inside one of
+   the profile currency's own does not count: the `S$` in a USD user's
+   `US$5` is part of `US$`; a bare `S$10` is Singapore's.
 3. Detect accounting negation: a fully parenthesized value becomes negative.
 4. Resolve the decimal separator:
      - exactly one of `.` or `,` present, and 1..2 digits follow it
@@ -174,8 +177,10 @@ Algorithm, in order:
      - none present -> integer major units
 5. Remove all grouping separators. Reject any remaining non-digit,
    non-sign, non-decimal character.
-6. Reject if the fractional part is longer than the currency's exponent (2).
-7. minor = majorDigits * 100 + fractionalDigits, zero-padded on the right.
+6. Reject if the fractional part is longer than the currency's exponent
+   (2 for PHP, USD, EUR; 0 for JPY, so any JPY decimal is rejected).
+7. minor = majorDigits * 10^exponent + fractionalDigits, zero-padded on the
+   right to the exponent.
    Compute on integer digit strings — never `major * 100` on a parsed float.
 8. Apply sign. Assert safe integer. Return.
 ```
@@ -456,6 +461,11 @@ routes its arithmetic through these.
 
 export type Minor = number;
 export type CurrencyCode = 'PHP' | 'USD' | 'EUR' | 'JPY' | (string & {});
+// Built so far (lib/core/money/currency.ts): the allowlist itself —
+//   SUPPORTED_CURRENCIES = ['PHP', 'USD', 'EUR', 'JPY'] as const
+//   type SupportedCurrency; isSupportedCurrency(code): code is SupportedCurrency
+//   currencyExponent(currency: SupportedCurrency): number   // JPY -> 0
+// The allowlist is mirrored by the profiles_currency_allowed constraint.
 
 export interface Money {
   readonly minor: Minor;
