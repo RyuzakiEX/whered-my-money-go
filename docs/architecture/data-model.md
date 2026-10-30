@@ -417,9 +417,9 @@ Conventions applied throughout, stated once:
 | Column | Type | Null | Default | Notes |
 |---|---|---|---|---|
 | `id` | `uuid` | no | — | PK and FK → `auth.users(id) on delete cascade`. Not a separate surrogate key: one profile per user, and sharing the id makes every RLS policy `id = auth.uid()` |
-| `display_name` | `text` | yes | `null` | Spec §22 `name`. Nullable — sign-up asks for email and password only; a required name is friction on the critical path. Check `length between 1 and 80` when present |
-| `currency` | `char(3)` | no | `'PHP'` | Spec §4.1 currency preference. ISO 4217 uppercase. PHP default per spec's ₱ examples |
-| `timezone` | `text` | no | `'Asia/Manila'` | Spec §4.1. IANA name, not an offset — offsets do not survive DST or legislative change. Validated against `pg_timezone_names` |
+| `display_name` | `text` | yes | `null` | Spec §22 `name`. Nullable — sign-up asks for email and password only; a required name is friction on the critical path. `profiles_display_name_length`: trimmed length 1–80 when present |
+| `currency` | `char(3)` | no | `'PHP'` | Spec §4.1 currency preference. `profiles_currency_allowed`: one of the MVP allowlist `PHP`, `USD`, `EUR`, `JPY` (decided 2026-10-30). PHP default per spec's ₱ examples. A new currency needs a migration **and** minor-unit support in `lib/core/money` |
+| `timezone` | `text` | no | `'Asia/Manila'` | Spec §4.1. IANA name, not an offset — offsets do not survive DST or legislative change. The database refuses blanks (`profiles_timezone_not_blank`); validity as a real zone is checked by the app (M1-B07), because a check constraint cannot consult `pg_timezone_names` |
 | `onboarding_completed_at` | `timestamptz` | yes | `null` | **Additive infrastructure, not a product change.** Drives the spec §30 first-run journey without a client-side flag that resets on a new device |
 | `created_at` | `timestamptz` | no | `now()` | |
 | `updated_at` | `timestamptz` | no | `now()` | Maintained by trigger |
@@ -676,7 +676,7 @@ names to translate a violation into a user-facing message
 | `budgets_expense_categories_only` | `budgets` | Trigger-enforced: the referenced category must have `type = 'expense'` | Spec §11 budgets are spending limits. A budget on "Salary" is meaningless, and every progress calculation would need a guard. Implemented as a `before insert or update` trigger rather than a check constraint, because a check constraint cannot reference another table |
 | `transactions_category_type_matches` | `transactions` | Trigger-enforced: an `income` transaction requires an `income` category (or none); `expense` requires `expense` | Prevents "Salary" appearing in the expense breakdown. Same cross-table limitation, same trigger mechanism |
 | `budgets_period_start_is_month_start` | `budgets` | `check (period <> 'monthly' or date_trunc('month', period_start) = period_start)` | Makes `budgets_unique_period` meaningful. Without it, `2026-09-01` and `2026-09-15` are two distinct September budgets |
-| `profiles_currency_iso` | `profiles` | `check (currency = upper(currency) and currency ~ '^[A-Z]{3}$')` | Applied to every `currency` column. Prevents `php` and `PHP` diverging |
+| `profiles_currency_allowed` | `profiles` | `check (currency in ('PHP', 'USD', 'EUR', 'JPY'))` | The MVP allowlist (M1-B01). Rejects `php`, unknown codes, and a two-letter code padded by `char(3)`. Other `currency` columns (`accounts`, `transactions`) take the same allowlist when their milestones land, so no row can hold a currency the profile could not |
 | `recurring_no_transfers` | `recurring_transactions` | `check (type <> 'transfer')` | See the table note |
 | `recurring_end_after_start` | `recurring_transactions` | `check (end_on is null or end_on >= start_on)` | |
 | `goals_target_date_future_on_insert` | `goals` | *Not enforced in SQL* | A user backdating a goal target is entering valid historical data. Validated in Zod at creation time with a warning, not a database rejection — see [api-and-data-access.md](api-and-data-access.md) |
@@ -748,8 +748,15 @@ privilege, and adding it "for consistency" is how privilege sprawl starts.
 
 ## Migration ordering
 
-One numbered migration per logical change, applied in filename order, never
-edited after merge. Each row below names what a milestone's `type:contract` task
+One migration per logical change, applied in filename order, never edited after
+merge. **Files are CLI-timestamped** (`20261030015135_create_profiles.sql`), as
+[database-migrations.md](../ops/database-migrations.md#naming) requires; the
+`0001`-style numbers below are the planned *order*, not filenames. As built:
+M1-B01/B02 landed `create_set_updated_at` (planned `0001`'s function),
+`create_profiles` + `enable_profiles_rls` (`0003`), and
+`create_profile_on_signup` (`0004`). `pgcrypto` needs no migration
+(`gen_random_uuid()` is core since Postgres 13), and the enums of `0002` arrive
+with the tables that use them (M2-B01 onwards) — `profiles` uses none. Each row below names what a milestone's `type:contract` task
 lands, so a backend task is unambiguous about which file it creates. Protocol:
 [../../workflow/05-milestones-and-streams.md](../../workflow/05-milestones-and-streams.md).
 

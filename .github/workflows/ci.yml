@@ -77,8 +77,8 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: npx --no -- commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
 
-      # Squash merge makes the PR title the commit on main (workflow/03-commits.md),
-      # so it is the message that matters most. GitHub appends " (#N)" to it,
+      # The PR title becomes the merge commit's title on main
+      # (workflow/03-commits.md). GitHub appends " (#N)" to it,
       # so that suffix is linted too — a 70-character title becomes a
       # 76-character header on main. Passed via env, never interpolated into
       # the script: a PR title is untrusted input.
