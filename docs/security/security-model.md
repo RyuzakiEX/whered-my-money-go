@@ -109,7 +109,7 @@ specifically attempts a foreign-account insert and asserts failure (`M3-B04`).
 | HTTPS everywhere (platform-enforced) |
 | No token in a URL, log, or error message ([observability.md](../architecture/observability.md#never-log-this)) |
 | Sign-out invalidates server-side |
-| **A stolen session cannot change the password through the app** (M1-B05): `updatePassword` accepts only a session from a password-recovery link in the last hour (`amr` method `otp`, read through the verified `getClaims()`). An ordinary password login is refused |
+| **A stolen session cannot change the password through the app** (M1-B05): `updatePassword` accepts only a session from a password-recovery link in the last hour (`amr` method `recovery` from the emailed link, or `otp` from its token hash; read through the verified `getClaims()`). An ordinary password login is refused |
 | Changing the password revokes every other session's refresh token — Supabase Auth does this itself (verified by test) |
 | `secure_password_change` on (local `config.toml`; preview `security_update_password_require_reauthentication`): Auth refuses a direct password change from a session that is not recent |
 
