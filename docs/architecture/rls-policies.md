@@ -138,11 +138,19 @@ afterwards*. Every update policy in this document states both, for the reader.
 > Postgres it does not: an UPDATE policy with no `with check` reuses its
 > `using` expression for the new row. The real hazard is a `with check`
 > **looser** than `using` — `with check (true)`, or a predicate on the wrong
-> column. And through PostgREST the new row is checked a second time: writes
-> carry `RETURNING`, so the new row must also pass the **select** policy. In
-> M1-B01's sabotage runs, moving a row to another id stayed blocked until
-> *both* the update's `with check` and the select policy were loosened. A test
-> for this attack therefore proves the policy set, not `with check` alone.
+> column.
+>
+> **The select policy is a second guard — but only for statements that read
+> columns.** Postgres applies SELECT policies to an UPDATE or DELETE that has a
+> `where` or `returning`. So `update … where id = <mine>` with a loose
+> `with check`, or `update … where id = <yours>` with `using (true)`, is still
+> blocked by the select policy. An **unfiltered** `update public.profiles set …`
+> is not: with an update policy of `using (true) with check (true)` it rewrote
+> every user's profile (M1-B03 sabotage run, `UPDATE 2`). Over the API,
+> Supabase's safe-update guard refuses any unfiltered UPDATE or DELETE
+> (`21000 UPDATE requires a WHERE clause`), but SQL inside the database — a
+> function, a trigger, a migration — has no such guard. Hence the reusable
+> assertion attacks both filtered **and** unfiltered.
 
 ### `accounts`
 

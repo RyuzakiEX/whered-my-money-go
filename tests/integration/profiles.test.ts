@@ -271,6 +271,26 @@ describe('profiles RLS (M1-B02)', () => {
     expect(await profileOf(a.id)).not.toBeNull();
   });
 
+  it('the API refuses an unfiltered update or delete outright', async () => {
+    // Postgres applies the select policy to UPDATE/DELETE only when the
+    // statement reads columns, so an unfiltered statement meets the update
+    // and delete policies alone — and the filtered tests above would pass
+    // against an update policy of `using (true)`. Over the API, Supabase's
+    // safe-update guard rejects such a request before RLS is consulted
+    // (21000). This pins that layer: if it ever goes, this fails, rather than
+    // the API path silently relying on the update policy alone. The pgTAP
+    // suite (supabase/tests/rls) covers unfiltered SQL inside the database,
+    // where no such guard exists.
+    const update = await asA.from('profiles').update({ display_name: 'pwned' });
+    const del = await asA.from('profiles').delete();
+    expect(update.error?.code).toBe('21000');
+    expect(del.error?.code).toBe('21000');
+
+    const bAfter = await profileOf(b.id);
+    expect(bAfter).not.toBeNull();
+    expect(bAfter?.display_name).not.toBe('pwned');
+  });
+
   it('gives the anon role no rows at all', async () => {
     const anon = createClient<Database>(LOCAL_API_URL, LOCAL_ANON_KEY, {
       auth: { persistSession: false, autoRefreshToken: false },
