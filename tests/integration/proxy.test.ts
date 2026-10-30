@@ -101,10 +101,14 @@ describe('signed out', () => {
   });
 
   it('treats a tampered session cookie as signed out', async () => {
-    const tampered = sessionCookies.map((c) => ({
-      ...c,
-      value: `${c.value}x`,
-    }));
+    // Corrupt the signature and the refresh token inside the decoded session.
+    // (Appending a character to the base64 cookie is NOT tampering: when the
+    // extra bits make no whole byte, decoding drops them and the original
+    // session survives — which made an earlier version of this test flaky.)
+    const tampered = editSession(sessionCookies, (session) => {
+      session.access_token = `${session.access_token.slice(0, -4)}AAAA`;
+      session.refresh_token = 'not-a-refresh-token';
+    });
     const res = await proxy(request('/dashboard', tampered));
     expect(redirectTarget(res)).toBe('/login?next=%2Fdashboard');
   });
@@ -132,16 +136,19 @@ describe('signed in', () => {
     expect(redirectTarget(res)).toBe('/goals');
   });
 
-  it.each(['https://evil.example/phish', '//evil.example', '/\\evil.example'])(
-    'refuses an off-site next %j: no open redirect',
-    async (next) => {
-      const res = await proxy(
-        request(`/login?next=${encodeURIComponent(next)}`),
-      );
-      expect(redirectTarget(res)).toBe('/dashboard');
-      expect(new URL(res.headers.get('location') ?? '').origin).toBe(ORIGIN);
-    },
-  );
+  it.each([
+    'https://evil.example/phish',
+    '//evil.example',
+    '/\\evil.example',
+    // Parser differentials that normalise to `//evil.example` (M1-B06 review).
+    '/.//evil.example',
+    '/%2e//evil.example',
+    '/a/..//evil.example',
+  ])('refuses an off-site next %j: no open redirect', async (next) => {
+    const res = await proxy(request(`/login?next=${encodeURIComponent(next)}`));
+    expect(redirectTarget(res)).toBe('/dashboard');
+    expect(new URL(res.headers.get('location') ?? '').origin).toBe(ORIGIN);
+  });
 });
 
 describe('a session that expires mid-visit', () => {
@@ -174,14 +181,19 @@ describe('matcher', () => {
   });
 });
 
+interface StoredSession {
+  access_token: string;
+  refresh_token: string;
+  expires_at: number;
+}
+
 /**
- * The same session, with its stored expiry moved into the past, so the client
- * must refresh it — the state a tab is in after sitting idle past the access
- * token's lifetime. @supabase/ssr stores the session as `base64-` + base64url
- * JSON, possibly split into `.0`, `.1` chunks.
+ * Decode @supabase/ssr's session cookie (`base64-` + base64url JSON, possibly
+ * split into `.0`, `.1` chunks), edit it, and re-encode it as one cookie.
  */
-function withExpiredAccessToken(
+function editSession(
   cookies: { name: string; value: string }[],
+  edit: (session: StoredSession) => void,
 ): { name: string; value: string }[] {
   const auth = cookies
     .filter((c) => c.name.includes('auth-token'))
@@ -190,13 +202,26 @@ function withExpiredAccessToken(
   if (!first) throw new Error('no auth cookie');
   const baseName = first.name.replace(/\.\d+$/, '');
   const raw = auth.map((c) => c.value).join('');
-  const json = JSON.parse(
+  const session = JSON.parse(
     Buffer.from(raw.replace(/^base64-/, ''), 'base64url').toString('utf8'),
-  ) as { expires_at: number };
-  json.expires_at = Math.floor(Date.now() / 1000) - 60;
-  const value = `base64-${Buffer.from(JSON.stringify(json)).toString('base64url')}`;
+  ) as StoredSession;
+  edit(session);
+  const value = `base64-${Buffer.from(JSON.stringify(session)).toString('base64url')}`;
   return [
     ...cookies.filter((c) => !c.name.includes('auth-token')),
     { name: baseName, value },
   ];
+}
+
+/**
+ * The same session, with its stored expiry moved into the past, so the client
+ * must refresh it — the state a tab is in after sitting idle past the access
+ * token's lifetime.
+ */
+function withExpiredAccessToken(
+  cookies: { name: string; value: string }[],
+): { name: string; value: string }[] {
+  return editSession(cookies, (session) => {
+    session.expires_at = Math.floor(Date.now() / 1000) - 60;
+  });
 }

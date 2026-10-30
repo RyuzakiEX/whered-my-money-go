@@ -70,7 +70,15 @@ export function safeNextPath(next: string | null | undefined): string | null {
     return null;
   }
   if (url.origin !== base) return null;
-  if (isSignedOutOnlyPath(url.pathname)) return null;
 
-  return `${url.pathname}${url.search}${url.hash}`;
+  // Check the NORMALISED path, not just the input: dot segments collapse, so
+  // `/.//evil.example` and `/a/..//evil.example` both become `//evil.example`,
+  // which a browser resolves to another host. Found by security review
+  // (M1-B06); the raw-input checks above all passed for them.
+  if (url.pathname.startsWith('//') || url.pathname.includes('\\')) return null;
+  const result = `${url.pathname}${url.search}${url.hash}`;
+  if (new URL(result, base).origin !== base) return null;
+
+  if (isSignedOutOnlyPath(url.pathname)) return null;
+  return result;
 }

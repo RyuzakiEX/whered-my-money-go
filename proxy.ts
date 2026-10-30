@@ -35,10 +35,14 @@ export async function proxy(request: NextRequest) {
 
   if (userId !== null && isSignedOutOnlyPath(pathname)) {
     const next = safeNextPath(searchParams.get('next'));
-    return redirectWithCookies(
-      new URL(next ?? DEFAULT_SIGNED_IN_PATH, request.url),
-      response,
-    );
+    const target = new URL(next ?? DEFAULT_SIGNED_IN_PATH, request.url);
+    // Second, independent guard: whatever `next` became, the redirect must
+    // stay on this origin. A path normalising to `//host` resolves off-site.
+    const destination =
+      target.origin === request.nextUrl.origin
+        ? target
+        : new URL(DEFAULT_SIGNED_IN_PATH, request.url);
+    return redirectWithCookies(destination, response);
   }
 
   return response;

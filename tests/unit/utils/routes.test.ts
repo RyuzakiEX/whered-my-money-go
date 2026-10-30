@@ -73,6 +73,12 @@ describe('safeNextPath', () => {
     ['javascript:alert(1)', 'script URL'],
     ['dashboard', 'relative path'],
     ['/%2F%2Fevil.example', 'encoded double slash, decoded by some stacks'],
+    // Parser differentials: each passes a raw-string check, then URL
+    // normalisation collapses it to `//evil.example`. Found by security
+    // review in M1-B06 — all three were accepted before the fix.
+    ['/.//evil.example', 'dot segment collapsing to //'],
+    ['/%2e//evil.example', 'encoded dot segment'],
+    ['/a/..//evil.example', 'parent segment collapsing to //'],
     ['/login', 'back to login would loop'],
     ['/signup', 'a signed-out-only page'],
     ['', 'empty'],
