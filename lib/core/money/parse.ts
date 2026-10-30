@@ -10,6 +10,15 @@
  * See docs/adr/0005-money-as-integer-minor-units.md.
  */
 
+import {
+  CURRENCY_MARKERS,
+  currencyExponent,
+  isSupportedCurrency,
+  SUPPORTED_CURRENCIES,
+  UNSUPPORTED_MARKERS,
+  type SupportedCurrency,
+} from './currency';
+
 /** An integer count of a currency's minor unit (centavos for PHP). */
 export type Minor = number;
 
@@ -24,42 +33,38 @@ export type ParseMoneyError =
 export type ParseMoneyResult =
   { ok: true; minor: Minor } | { ok: false; reason: ParseMoneyError };
 
-/** Minor-unit exponent per currency. PHP has 2 (centavos). */
-const EXPONENT: Readonly<Record<string, number>> = { PHP: 2 };
-
-/** Symbols and codes belonging to each supported currency. */
-const OWN_MARKERS: Readonly<Record<string, readonly string[]>> = {
-  PHP: ['₱', 'PHP', 'php'],
-};
-
 /**
- * Markers for currencies we do NOT handle. An unrecognised symbol is an
- * error, not something to strip — silently treating `$10` as ₱10 is the kind
- * of mistake that is invisible until it has corrupted a balance.
+ * Every marker that is foreign to `currency`: the other supported currencies'
+ * markers plus every unsupported one. An unrecognised symbol is an error, not
+ * something to strip — silently treating `$10` as ₱10 is the kind of mistake
+ * that is invisible until it has corrupted a balance.
  */
-const FOREIGN_MARKERS: readonly string[] = [
-  '$',
-  '€',
-  '£',
-  '¥',
-  '₩',
-  '₹',
-  '₫',
-  '฿',
-  'RM',
-  'S$',
-  'A$',
-  'USD',
-  'EUR',
-  'GBP',
-  'JPY',
-  'KRW',
-  'INR',
-  'SGD',
-  'AUD',
-  'MYR',
-  'THB',
-];
+function foreignMarkers(currency: SupportedCurrency): readonly string[] {
+  const others = SUPPORTED_CURRENCIES.filter((c) => c !== currency).flatMap(
+    (c) => CURRENCY_MARKERS[c],
+  );
+  return [...others, ...UNSUPPORTED_MARKERS];
+}
+
+/** Character positions covered by an occurrence of any of `markers`. */
+function coveredPositions(
+  text: string,
+  markers: readonly string[],
+): Set<number> {
+  const covered = new Set<number>();
+  // Longest first, so `US$` claims its `$` before a bare `$` would.
+  const longestFirst = [...markers].sort((a, b) => b.length - a.length);
+  for (const marker of longestFirst) {
+    for (
+      let at = text.indexOf(marker);
+      at !== -1;
+      at = text.indexOf(marker, at + 1)
+    ) {
+      for (let i = at; i < at + marker.length; i++) covered.add(i);
+    }
+  }
+  return covered;
+}
 
 /** Unicode spaces used as grouping separators. */
 const SPACE_SEPARATORS = /[     \s]/g;
@@ -78,22 +83,38 @@ export function parseMoneyToMinor(
   input: string,
   currency: string,
 ): ParseMoneyResult {
-  const exponent = EXPONENT[currency];
-  if (exponent === undefined) return fail('foreign_currency');
+  if (!isSupportedCurrency(currency)) return fail('foreign_currency');
+  const exponent = currencyExponent(currency);
 
-  // Step 1 — trim and normalise Unicode spaces away.
-  let text = input.replace(SPACE_SEPARATORS, '');
+  // Step 1 — trim and normalise Unicode spaces away. Uppercase so `php 10`
+  // matches the `PHP` marker; only digits and separators survive step 2, so
+  // case never matters past here.
+  let text = input.replace(SPACE_SEPARATORS, '').toUpperCase();
   if (text.length === 0) return fail('empty');
 
   // Step 2 — reject a marker belonging to another currency before stripping
-  // our own, so "$1,234.50" is an error rather than ₱1,234.50.
-  const upper = text.toUpperCase();
-  for (const marker of FOREIGN_MARKERS) {
-    if (upper.includes(marker.toUpperCase())) return fail('foreign_currency');
+  // our own, so "$1,234.50" is an error for PHP rather than ₱1,234.50.
+  // A foreign marker inside one of our own does not count: the `S$` within a
+  // USD user's `US$5` is part of `US$`, while a bare `S$10` is Singapore's.
+  const own = CURRENCY_MARKERS[currency];
+  const ours = coveredPositions(text, own);
+  for (const marker of foreignMarkers(currency)) {
+    for (
+      let at = text.indexOf(marker);
+      at !== -1;
+      at = text.indexOf(marker, at + 1)
+    ) {
+      let inside = true;
+      for (let i = at; i < at + marker.length; i++) {
+        if (!ours.has(i)) inside = false;
+      }
+      if (!inside) return fail('foreign_currency');
+    }
   }
-  for (const marker of OWN_MARKERS[currency] ?? []) {
-    text = text.split(marker).join('');
-  }
+  text = text
+    .split('')
+    .filter((_, i) => !ours.has(i))
+    .join('');
   if (text.length === 0) return fail('empty');
 
   // Step 3 — accounting negation: a fully parenthesised value is negative.
@@ -223,9 +244,9 @@ export function formatMinor(
   currency: string,
   locale = 'en-PH',
 ): string {
-  const exponent =
-    EXPONENT[currency] ??
-    2; /* v8 ignore next -- defensive: callers pass a supported currency */
+  const exponent = isSupportedCurrency(currency)
+    ? currencyExponent(currency)
+    : 2; /* v8 ignore next -- defensive: callers pass a supported currency */
   const divisor = 10 ** exponent;
 
   return new Intl.NumberFormat(locale, {
