@@ -147,7 +147,7 @@ adds the custom domain, which is the publicly reachable entry point.
 
 ```text
 push to a PR branch ──► preview deployment (Preview env vars, preview Supabase)
-                              │  CI gates green, PR squash-merged
+                              │  CI gates green, PR merged (merge commit)
                               ▼
 push to main ─────────► production deployment (Production env vars)
                               │  goes live on the production URL automatically
