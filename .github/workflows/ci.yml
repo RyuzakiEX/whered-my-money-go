@@ -24,6 +24,14 @@ concurrency:
   # Never cancel a run on main: those gate deploys.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# Pull the local stack's images from GitHub's registry, not the CLI default
+# (public.ecr.aws). Anonymous ECR pulls are quota-limited, and runners share
+# egress IPs: PR #43's e2e job failed every pull with "Data limit exceeded"
+# while sibling jobs passed. Workflow-level, because `db diff`, `gen types`, and
+# `test db` pull images of their own too. See workflow/08-ci-gates.md.
+env:
+  SUPABASE_INTERNAL_IMAGE_REGISTRY: ghcr.io
+
 jobs:
   lint:
     name: lint
@@ -114,6 +122,12 @@ jobs:
 
   integration:
     name: integration tests
+    # packages: read lets the start-supabase action authenticate its pulls.
+    # Job-level permissions replace the workflow's, so contents: read is
+    # restated.
+    permissions:
+      contents: read
+      packages: read
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -135,7 +149,7 @@ jobs:
       # A throwaway local Postgres. No secrets needed, so this runs on fork
       # PRs too — see docs/ops/environments.md.
       - name: Start local Supabase
-        run: supabase start
+        uses: ./.github/actions/start-supabase
 
       - name: Apply migrations and seed
         run: supabase db reset --no-seed=false

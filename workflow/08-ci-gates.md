@@ -133,6 +133,14 @@ expiry date, and review):
 | **No `pull_request_target`** | It runs with secrets against untrusted code. |
 | Aggregates use `require-results` | One strict implementation of "every job succeeded", instead of five copies of a lenient one. |
 | No `paths-ignore` on **any** workflow | Every aggregate is a required check. `e2e.yml` lost its filter in M0-B08; with the browser cache the job takes about three minutes. |
+| **The local Supabase stack starts through [`start-supabase`](../.github/actions/start-supabase/action.yml)**, with `SUPABASE_INTERNAL_IMAGE_REGISTRY: ghcr.io` at workflow level and job-level `packages: read`, in `ci.yml` (integration), `e2e.yml`, and `schema-drift.yml` | Registry throttling, three layers deep. The CLI default, `public.ecr.aws`, failed #43 with `Data limit exceeded`, so images come from `ghcr.io`. Anonymous `ghcr.io` failed #44's first run with `retry-after … allowed: 44000/minute`, so the action logs in with the per-run `GITHUB_TOKEN` (read-only on fork PRs — no repository secret). Even authenticated, `ghcr.io` still answers the CLI's parallel pulls with short `retry-after` throttles, so the action retries `supabase start` up to 3 times, each retry a visible `::warning::`. Local development keeps the defaults. |
+
+**`supabase start` failing with `Data limit exceeded`, `toomanyrequests`, or
+`retry-after`** is a registry quota, not your change. A `::warning::` that a
+start attempt failed is expected occasionally; the same warning on most runs
+means the quota has tightened and the retry is hiding it, which is worth an
+issue. Three failed attempts is a red job: check the pulls name `ghcr.io` and
+that `Log in to ghcr.io` succeeded before re-running.
 
 ## Next
 

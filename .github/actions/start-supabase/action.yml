@@ -1,0 +1,51 @@
+name: Start local Supabase
+description: >
+  Starts the CLI's local Supabase stack for a CI job, resilient to registry
+  throttling. One implementation for every workflow that needs the stack, so
+  the workarounds below cannot drift between copies. The calling job needs
+  `packages: read` and the workflow-level `SUPABASE_INTERNAL_IMAGE_REGISTRY`.
+  See workflow/08-ci-gates.md.
+
+inputs:
+  attempts:
+    description: How many times to try `supabase start` before failing.
+    required: false
+    default: "3"
+
+runs:
+  using: composite
+  steps:
+    # Anonymous registry pulls share a per-IP quota with every job on the
+    # runner's egress IP: ECR failed #43 outright, anonymous ghcr.io failed
+    # #44's first run. GITHUB_TOKEN is minted per run (read-only on fork PRs),
+    # so this adds no repository secret.
+    - name: Log in to ghcr.io
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        ACTOR: ${{ github.actor }}
+      run: echo "$GH_TOKEN" | docker login ghcr.io --username "$ACTOR" --password-stdin
+
+    # Even authenticated, ghcr.io throttles the CLI's ~12 parallel pulls with
+    # sub-millisecond `retry-after` responses; the CLI retries internally and
+    # usually succeeds, but can exhaust its retries. A retry here is cheap:
+    # layers already pulled stay in the local image store. Each retry is a
+    # visible warning, never silent.
+    - name: supabase start (with retry)
+      shell: bash
+      env:
+        ATTEMPTS: ${{ inputs.attempts }}
+      run: |
+        set -uo pipefail
+        for attempt in $(seq 1 "$ATTEMPTS"); do
+          if supabase start; then
+            exit 0
+          fi
+          if [ "$attempt" -eq "$ATTEMPTS" ]; then
+            echo "::error::supabase start failed $ATTEMPTS times. Check the pulls for 'retry-after' or 'Data limit exceeded' (registry quota) before suspecting the change. See workflow/08-ci-gates.md."
+            exit 1
+          fi
+          echo "::warning::supabase start failed (attempt $attempt of $ATTEMPTS); retrying. Registry throttling is the usual cause — see workflow/08-ci-gates.md."
+          supabase stop --no-backup || true
+          sleep $((attempt * 15))
+        done
