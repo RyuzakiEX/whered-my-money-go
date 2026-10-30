@@ -5,6 +5,11 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import type { FormAction, FormState } from '@/components/auth/form-parts';
 import { LogInForm } from '@/components/auth/log-in-form';
+import { NewPasswordForm } from '@/components/auth/new-password-form';
+import {
+  RESET_REQUESTED,
+  ResetRequestForm,
+} from '@/components/auth/reset-request-form';
 import { SignUpForm } from '@/components/auth/sign-up-form';
 
 /**
@@ -134,5 +139,51 @@ describe('LogInForm', () => {
     expect(screen.getByLabelText('Password').getAttribute('autocomplete')).toBe(
       'current-password',
     );
+  });
+});
+
+describe('ResetRequestForm (M1-F03)', () => {
+  it('replaces the form with the one uniform confirmation once sent', async () => {
+    const user = userEvent.setup();
+    const action: FormAction = () => Promise.resolve({ done: true });
+    render(<ResetRequestForm action={action} />);
+
+    await user.type(screen.getByLabelText('Email'), 'ana@example.test');
+    await user.click(
+      screen.getByRole('button', { name: 'Send me a reset link' }),
+    );
+
+    expect((await screen.findByRole('status')).textContent).toBe(
+      RESET_REQUESTED,
+    );
+    expect(screen.queryByLabelText('Email')).toBeNull();
+  });
+});
+
+describe('NewPasswordForm (M1-F03)', () => {
+  it('flags a mismatched confirmation on that field, without sending', async () => {
+    const user = userEvent.setup();
+    const { action, calls } = pendingAction();
+    render(<NewPasswordForm action={action} />);
+
+    await user.type(screen.getByLabelText('New password'), 'brand-new-pass-1');
+    await user.type(screen.getByLabelText('Type it again'), 'brand-new-pass-2');
+    await user.click(
+      screen.getByRole('button', { name: 'Save my new password' }),
+    );
+
+    expect(calls).toHaveLength(0);
+    expect(
+      document.getElementById('confirmPassword-error')?.textContent,
+    ).toMatch(/don't match/);
+  });
+
+  it('marks both fields as new passwords for password managers', () => {
+    render(<NewPasswordForm action={pendingAction().action} />);
+    for (const label of ['New password', 'Type it again']) {
+      expect(screen.getByLabelText(label).getAttribute('autocomplete')).toBe(
+        'new-password',
+      );
+    }
   });
 });

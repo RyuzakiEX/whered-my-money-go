@@ -36,7 +36,7 @@ messages** that never reveal whether an email is registered, and the rule that
 | [x] | M1-B07 | `[M1][BE] Implement the updateProfile action` |
 | [x] | M1-F01 | `[M1][FE] Build the sign-up page` |
 | [x] | M1-F02 | `[M1][FE] Build the login page` |
-| [ ] | M1-F03 | `[M1][FE] Build the password reset pages` |
+| [x] | M1-F03 | `[M1][FE] Build the password reset pages` |
 | [ ] | M1-F04 | `[M1][FE] Build the account menu with logout` |
 | [ ] | M1-F05 | `[M1][FE] Build the Settings > Profile screen` |
 | [ ] | M1-B08 | `[M1][DO] Add the auth happy-path E2E test` |
