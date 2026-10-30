@@ -204,7 +204,8 @@ command. See [08-ci-gates.md](08-ci-gates.md) for the job-to-script mapping.
 | `npm run test` | Unit suite (Vitest, `tests/unit/**`) |
 | `npm run test:watch` | Unit suite in watch mode |
 | `npm run test:coverage` | Unit suite with coverage thresholds enforced |
-| `npm run test:integration` | Integration suite — **needs `npx supabase start`** and the anon key in `.env.local` |
+| `npm run test:integration` | Integration suite, then `test:rls` — **needs `npx supabase start`** and the anon key in `.env.local` |
+| `npm run test:rls` | pgTAP RLS suite (`supabase test db --local`) — needs `npx supabase start`. See [supabase/tests/rls](../supabase/tests/rls/README.md) |
 | `npm run test:e2e` | Playwright E2E — starts `npm run dev` itself, or reuses one already on port 3000. See [Running E2E](#running-e2e) |
 | `npm run db:types` | Regenerate `types/database.types.ts` from the local database — **needs `npx supabase start`** |
 | `npm run db:reset` | Replay every migration from empty, then `supabase/seed.sql` |
@@ -235,7 +236,7 @@ docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -e CI=1 \
 same as CI. The app has to start *inside* the container: with Docker Desktop,
 the container cannot reach a server on WSL's `localhost`.
 
-`verify` deliberately omits `test:integration` and `test:e2e`: both need
+`verify` deliberately omits `test:integration`, `test:rls`, and `test:e2e`: they need
 services running, and a pre-push check that fails because Docker is stopped is
 a check people route around. CI runs them as their own jobs.
 

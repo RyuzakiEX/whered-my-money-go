@@ -75,7 +75,7 @@ npm run db:types
 
 # 6. Write the pgTAP isolation test
 $EDITOR supabase/tests/rls/accounts.sql
-supabase test db
+npm run test:rls
 
 # 7. Update the docs in this SAME PR
 $EDITOR docs/architecture/data-model.md

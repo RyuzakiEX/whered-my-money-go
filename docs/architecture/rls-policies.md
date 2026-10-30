@@ -128,12 +128,29 @@ No delete policy: account deletion goes through Supabase Auth, and the
 `on delete cascade` from `auth.users` removes the profile. A user deleting their
 profile row while their auth user survives leaves an unusable account.
 
-Both `using` and `with check` on update, with identical predicates. Omitting
-`with check` is the classic RLS mistake on updates: `using` gates *which rows
-you may target*, `with check` gates *what the row looks like afterwards*. With
-only `using`, a user could `update profiles set id = <someone else's uuid>` —
-they may target their own row, and nothing validates the result. Every update
-policy in this document carries both.
+Both `using` and `with check` on update, with identical predicates. `using`
+gates *which rows you may target*; `with check` gates *what the row looks like
+afterwards*. Every update policy in this document states both, for the reader.
+
+> [!NOTE]
+> **Corrected in M1-B01 by experiment.** This section used to say that omitting
+> `with check` lets a user `update profiles set id = <someone else's uuid>`. In
+> Postgres it does not: an UPDATE policy with no `with check` reuses its
+> `using` expression for the new row. The real hazard is a `with check`
+> **looser** than `using` — `with check (true)`, or a predicate on the wrong
+> column.
+>
+> **The select policy is a second guard — but only for statements that read
+> columns.** Postgres applies SELECT policies to an UPDATE or DELETE that has a
+> `where` or `returning`. So `update … where id = <mine>` with a loose
+> `with check`, or `update … where id = <yours>` with `using (true)`, is still
+> blocked by the select policy. An **unfiltered** `update public.profiles set …`
+> is not: with an update policy of `using (true) with check (true)` it rewrote
+> every user's profile (M1-B03 sabotage run, `UPDATE 2`). Over the API,
+> Supabase's safe-update guard refuses any unfiltered UPDATE or DELETE
+> (`21000 UPDATE requires a WHERE clause`), but SQL inside the database — a
+> function, a trigger, a migration — has no such guard. Hence the reusable
+> assertion attacks both filtered **and** unfiltered.
 
 ### `accounts`
 
@@ -576,6 +593,13 @@ safe" would be exactly backwards.
 ## Profile creation
 
 Profiles are created by a trigger on `auth.users`, never by application code.
+M1-B01 ships the profile half
+(`supabase/migrations/20261030015140_create_profile_on_signup.sql`): currency
+and timezone come from the column defaults, a sign-up `display_name` is taken
+from `raw_user_meta_data` when it fits the length check (otherwise `null`, so
+sign-up never fails on a cosmetic field), and `on conflict (id) do nothing`
+makes a second invocation a no-op. The categories insert below arrives with
+M2's `seed_default_categories` migration.
 
 ```sql
 create function public.handle_new_user()
@@ -585,8 +609,9 @@ security definer
 set search_path = ''
 as $$
 begin
-  insert into public.profiles (id, currency, timezone)
-  values (new.id, 'PHP', 'Asia/Manila');
+  insert into public.profiles (id, display_name)
+  values (new.id, /* trimmed metadata name, or null */)
+  on conflict (id) do nothing;
 
   insert into public.categories (user_id, name, type, color, is_default)
   select new.id, d.name, d.type, d.color, true
@@ -648,119 +673,60 @@ perfectly. It therefore gets tests that assert *absence* of access, not presence
 Location: `supabase/tests/rls/`, run with pgTAP against a local Supabase
 ([source-structure.md](source-structure.md#the-tree)).
 
-### Fixture: two seeded users
+### The harness (built in M1-B03)
 
-```sql
--- supabase/tests/rls/00-fixtures.sql
-insert into auth.users (id, email) values
-  ('11111111-1111-1111-1111-111111111111', 'alice@test.local'),
-  ('22222222-2222-2222-2222-222222222222', 'bob@test.local');
--- The on_auth_user_created trigger gives each a profile and default categories.
+Lives in [`supabase/tests/rls/`](../../supabase/tests/rls/README.md), which is
+the reference for usage and the copy-paste template. The design, in brief:
 
--- Each user gets one row in every table, so every cross-user assertion has
--- something real to fail against. A test that passes because the table is
--- empty is worse than no test.
-```
-
-Impersonation helper — this is the mechanism the whole suite rests on:
-
-```sql
-create or replace function tests.authenticate_as(user_id uuid)
-returns void language plpgsql as $$
-begin
-  perform set_config('role', 'authenticated', true);
-  perform set_config(
-    'request.jwt.claims',
-    json_build_object('sub', user_id::text, 'role', 'authenticated')::text,
-    true
-  );
-end;
-$$;
-```
-
-Tests run as `authenticated`, never as the migration role or `postgres`. A suite
-that runs as the owner passes regardless of what the policies say — the single
-most common way an RLS test suite becomes theatre.
+- **Every test file is self-contained.** It opens a transaction, includes
+  [`helpers.psql`](../../supabase/tests/rls/helpers.psql) with `\ir`, and rolls
+  back — so fixtures, the `tests` schema, and role switches never persist, and
+  no file depends on another. (`.psql`, because `supabase test db` runs every
+  `.sql` file as a test.)
+- **Two seeded users**, `tests.user_a()` and `tests.user_b()`, inserted into
+  `auth.users` so the real `on_auth_user_created` trigger gives each a profile.
+  Each test file then seeds one row per user in the table under test: a test
+  that passes because the table is empty is worse than no test.
+- **Impersonation** via `tests.authenticate_as(uuid)` /
+  `tests.authenticate_anon()`, which set `role` and `request.jwt.claims`
+  transaction-locally. Tests run as `authenticated` or `anon`, never as the
+  migration role or `postgres`: a suite that runs as the owner passes regardless
+  of what the policies say — the single most common way an RLS test suite
+  becomes theatre.
 
 ### The reusable assertion
 
-One function, applied to every table. New table, one line of test.
+`tests.assert_user_isolated(tbl, owner_column, insert_sql)` — one call per
+table, **9 assertions**, as `user_b` against `user_a`'s rows:
 
-```sql
--- supabase/tests/rls/01-isolation.sql
-create or replace function tests.assert_user_isolated(
-  tbl        text,
-  owner_id   uuid,
-  intruder_id uuid
-) returns setof text language plpgsql as $$
-declare
-  visible bigint;
-begin
-  -- 1. The owner can see their own row.
-  perform tests.authenticate_as(owner_id);
-  execute format('select count(*) from public.%I', tbl) into visible;
-  return next ok(visible > 0,
-    tbl || ': owner sees their own rows (fixture sanity)');
+1. Both users own rows, and the owner sees theirs (fixture sanity).
+2. The rows are invisible.
+3. An update **with** `where <owner_column> = user_a` affects 0 rows.
+4. A delete **with** that `where` affects 0 rows.
+5. An update **with no `where` at all** touches no more than `user_b`'s own rows.
+6. A delete **with no `where`** likewise.
+7. `update … set <owner_column> = user_a` (handing one's own rows over) raises
+   `42501`.
+8. Inserting a row carrying `user_a`'s id raises `42501`.
+9. `user_a`'s rows survive all of it.
 
-  -- 2. The intruder sees ZERO of the owner's rows.
-  perform tests.authenticate_as(intruder_id);
-  execute format(
-    'select count(*) from public.%I where user_id = %L', tbl, owner_id
-  ) into visible;
-  return next is(visible, 0::bigint,
-    tbl || ': cross-user select returns 0 rows');
+**Assert rows affected, not exceptions, for update and delete.** Under RLS they
+do not raise — invisible rows are filtered out and the statement succeeds having
+changed nothing. A `throws_ok` there passes when the policy is correct *and*
+when it is missing entirely.
 
-  -- 3. The intruder cannot write a row owned by the owner.
-  return next throws_ok(
-    format('insert into public.%I (user_id) values (%L)', tbl, owner_id),
-    '42501',
-    'new row violates row-level security policy',
-    tbl || ': cross-user insert is rejected'
-  );
+**Steps 5 and 6 are not redundant with 3 and 4.** Postgres applies SELECT
+policies to an UPDATE or DELETE only when the statement reads columns. A
+filtered attack is therefore also stopped by the select policy, which masks a
+broken update or delete policy: in M1-B03, a filtered-only version of this
+assertion passed against `for update using (true) with check (true)`, while an
+unfiltered `update` rewrote every user's row. The unfiltered steps run in a
+subtransaction that is always rolled back, so the fixtures survive.
 
-  -- 4. The intruder cannot update or delete the owner's rows.
-  --    Note: RLS makes these no-ops, not errors — the rows are simply
-  --    invisible. Assert ZERO ROWS AFFECTED, not an exception. Expecting a
-  --    raised error here is the mistake that makes this test always pass.
-  execute format(
-    'update public.%I set updated_at = now() where user_id = %L', tbl, owner_id
-  );
-  return next is(
-    (select count(*) from tests.rows_affected()), 0::bigint,
-    tbl || ': cross-user update affects 0 rows'
-  );
-
-  execute format('delete from public.%I where user_id = %L', tbl, owner_id);
-  return next is(
-    (select count(*) from tests.rows_affected()), 0::bigint,
-    tbl || ': cross-user delete affects 0 rows'
-  );
-end;
-$$;
-```
-
-Step 4's comment is the trap worth calling out. `update` and `delete` under RLS
-do not raise — the target rows are filtered out by `using`, so the statement
-succeeds having changed nothing. A test written as `throws_ok` for those
-operations passes when the policy is correct *and* when it is missing entirely.
-Assert the row count.
-
-Applied to every table:
-
-```sql
-select plan(45);
-
-select tests.assert_user_isolated('accounts',               alice, bob);
-select tests.assert_user_isolated('categories',             alice, bob);
-select tests.assert_user_isolated('transactions',           alice, bob);
-select tests.assert_user_isolated('budgets',                alice, bob);
-select tests.assert_user_isolated('goals',                  alice, bob);
-select tests.assert_user_isolated('goal_contributions',     alice, bob);
-select tests.assert_user_isolated('recurring_transactions', alice, bob);
--- profiles and audit_log use variants: different id column, denied ops.
-
-select * from finish();
-```
+`profiles` keys on `id` rather than `user_id`, and adds its own denials
+(no insert even of one's own id, forced RLS, exactly two policies, trigger
+idempotency) in [`profiles_test.sql`](../../supabase/tests/rls/profiles_test.sql).
+Every later table is one file following the README's template.
 
 ### Cross-table ownership tests
 

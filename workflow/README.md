@@ -60,8 +60,8 @@ than quietly implied.
    the local command for every job.
 7. **Open the PR, self-review the diff first**, then let the gates run.
    `ci`, `security`, and `docs` are the required aggregate checks.
-8. **Squash merge.** The PR title becomes the commit, so the title itself has to
-   be a valid conventional commit. Branch deletes itself; `Closes #42` closes
+8. **Merge (merge commit).** The PR title becomes the merge commit's title, so
+   it has to be a valid conventional commit; the branch's commits land too. Branch deletes itself; `Closes #42` closes
    the issue.
 9. **New work discovered? File a new issue.** Do not grow the PR. See
    [06-task-lifecycle.md](06-task-lifecycle.md#the-scope-rule).

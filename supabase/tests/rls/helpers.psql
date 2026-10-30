@@ -1,0 +1,184 @@
+-- RLS test harness (M1-B03). Included by every RLS test file:
+--
+--     begin;
+--     \ir helpers.psql
+--     select plan(N);
+--     ...
+--     select * from finish();
+--     rollback;
+--
+-- `.psql`, not `.sql`: `supabase test db` runs every `.sql` file under
+-- supabase/tests as a pgTAP test, and a helpers file has no plan of its own.
+--
+-- Everything here is created INSIDE the caller's transaction, so the rollback
+-- at the end of each test file removes it. Nothing persists in the database,
+-- and no test depends on another file having run first.
+--
+-- Usage and the copy-paste example: supabase/tests/rls/README.md.
+
+create schema tests;
+grant usage on schema tests to anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Two users with known ids. Inserting into auth.users fires
+-- on_auth_user_created, so each gets a profile exactly as a real sign-up does.
+-- Every later milestone's fixtures hang their rows off these two.
+-- ---------------------------------------------------------------------------
+
+create function tests.user_a() returns uuid language sql immutable
+  as $$ select 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid $$;
+create function tests.user_b() returns uuid language sql immutable
+  as $$ select 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'::uuid $$;
+
+insert into auth.users (id, instance_id, aud, role, email)
+values
+  (tests.user_a(), '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'user_a@test.local'),
+  (tests.user_b(), '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'user_b@test.local');
+
+-- ---------------------------------------------------------------------------
+-- Impersonation. Tests must run as `authenticated` (or `anon`), never as the
+-- owner: a suite that runs as postgres passes whatever the policies say.
+-- `true` = transaction-local, so a rollback also undoes the role switch.
+-- ---------------------------------------------------------------------------
+
+create function tests.authenticate_as(user_id uuid) returns void
+language plpgsql as $$
+begin
+  perform pg_catalog.set_config('role', 'authenticated', true);
+  perform pg_catalog.set_config(
+    'request.jwt.claims',
+    pg_catalog.json_build_object('sub', user_id::text, 'role', 'authenticated')::text,
+    true
+  );
+end;
+$$;
+
+create function tests.authenticate_anon() returns void
+language plpgsql as $$
+begin
+  perform pg_catalog.set_config('role', 'anon', true);
+  perform pg_catalog.set_config('request.jwt.claims', '{"role":"anon"}', true);
+end;
+$$;
+
+-- Back to the test runner's own role, between assertions.
+create function tests.reset_role() returns void
+language plpgsql as $$
+begin
+  reset role;
+  perform pg_catalog.set_config('request.jwt.claims', '', true);
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- The reusable assertion: "this table is user-isolated".
+--
+--   tbl          table in public
+--   owner_column the column holding the owning user's id ('user_id', or 'id'
+--                for profiles)
+--   insert_sql   an INSERT for one valid row, with %L where the owner id goes
+--
+-- Nine assertions. Both users must own at least one row (fixture sanity — a
+-- test that passes because the table is empty proves nothing). Then, as
+-- user_b against user_a's rows: invisible; un-updatable and un-deletable both
+-- WITH a `where` naming them and WITHOUT any `where`; user_b cannot hand their
+-- own rows to user_a; and user_b cannot insert a row carrying user_a's id.
+--
+-- Why unfiltered statements too: Postgres applies SELECT policies to an
+-- UPDATE or DELETE only when the statement reads columns (a `where` or
+-- `returning`). `update t set c = c where owner = A` is therefore blocked by
+-- the select policy even when the update policy is `using (true)` — and the
+-- same update with no `where` rewrites every row. Found in M1-B03 by sabotage:
+-- the filtered-only version of this assertion passed against an update policy
+-- of `using (true) with check (true)`.
+--
+-- UPDATE and DELETE under RLS do not raise: invisible rows are filtered out
+-- and the statement succeeds having changed nothing. So those steps assert
+-- ROWS AFFECTED. Asserting an exception there passes when the policy is
+-- correct AND when it is missing — the classic way this test becomes theatre.
+-- ---------------------------------------------------------------------------
+
+create function tests.assert_user_isolated(
+  tbl text,
+  owner_column text,
+  insert_sql text
+) returns setof text
+language plpgsql as $$
+declare
+  n bigint;
+  b_owned bigint;
+begin
+  -- Fixture sanity, as the runner: both users own rows.
+  execute pg_catalog.format(
+    'select count(*) from public.%I where %I = %L', tbl, owner_column, tests.user_b()
+  ) into b_owned;
+  perform tests.authenticate_as(tests.user_a());
+  execute pg_catalog.format(
+    'select count(*) from public.%I where %I = %L', tbl, owner_column, tests.user_a()
+  ) into n;
+  return next ok(n > 0 and b_owned > 0,
+    tbl || ': both fixture users own rows, and the owner sees theirs');
+
+  perform tests.authenticate_as(tests.user_b());
+
+  execute pg_catalog.format(
+    'select count(*) from public.%I where %I = %L', tbl, owner_column, tests.user_a()
+  ) into n;
+  return next is(n, 0::bigint, tbl || ': another user''s rows are invisible');
+
+  execute pg_catalog.format(
+    'update public.%I set %I = %I where %I = %L',
+    tbl, owner_column, owner_column, owner_column, tests.user_a()
+  );
+  get diagnostics n = row_count;
+  return next is(n, 0::bigint, tbl || ': another user''s rows cannot be updated (where)');
+
+  execute pg_catalog.format(
+    'delete from public.%I where %I = %L', tbl, owner_column, tests.user_a()
+  );
+  get diagnostics n = row_count;
+  return next is(n, 0::bigint, tbl || ': another user''s rows cannot be deleted (where)');
+
+  -- Unfiltered statements run in a subtransaction that is always rolled back,
+  -- so the fixtures survive. Variables keep their values across the rollback.
+  begin
+    execute pg_catalog.format('update public.%I set %I = %I', tbl, owner_column, owner_column);
+    get diagnostics n = row_count;
+    raise exception using errcode = 'P0001', message = 'rollback';
+  exception when sqlstate 'P0001' then null;
+  end;
+  return next cmp_ok(n, '<=', b_owned,
+    tbl || ': an unfiltered update touches no other user''s rows');
+
+  begin
+    execute pg_catalog.format('delete from public.%I', tbl);
+    get diagnostics n = row_count;
+    raise exception using errcode = 'P0001', message = 'rollback';
+  exception when sqlstate 'P0001' then null;
+  end;
+  return next cmp_ok(n, '<=', b_owned,
+    tbl || ': an unfiltered delete touches no other user''s rows');
+
+  return next throws_ok(
+    pg_catalog.format('update public.%I set %I = %L', tbl, owner_column, tests.user_a()),
+    '42501',
+    null,
+    tbl || ': cannot hand own rows to another user'
+  );
+
+  return next throws_ok(
+    pg_catalog.format(insert_sql, tests.user_a()),
+    '42501',
+    null,
+    tbl || ': cannot insert a row owned by another user'
+  );
+
+  perform tests.reset_role();
+  execute pg_catalog.format(
+    'select count(*) from public.%I where %I = %L', tbl, owner_column, tests.user_a()
+  ) into n;
+  return next ok(n > 0, tbl || ': owner''s rows survived the intrusion attempts');
+end;
+$$;
+
+grant execute on all functions in schema tests to anon, authenticated;
