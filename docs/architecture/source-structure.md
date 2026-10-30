@@ -93,7 +93,7 @@ tests/
   e2e/                       # Playwright
   fixtures/                  # shared factories and seed data builders
 
-middleware.ts                # Supabase session refresh + route protection
+proxy.ts                     # Supabase session refresh + route protection (Next 16's middleware)
 ```
 
 ## Import rules
