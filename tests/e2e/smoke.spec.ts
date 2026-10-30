@@ -26,3 +26,28 @@ test('/login renders', async ({ page }) => {
   ).toBeVisible();
   await expect(page).toHaveTitle(/Log in/);
 });
+
+test('serves the favicon and the home-screen icon', async ({
+  page,
+  request,
+}) => {
+  await page.goto('/');
+
+  // Next emits these from app/icon.svg and app/apple-icon.png. Checking the
+  // fetched content type, not just the tag, catches a broken or missing file.
+  const icons = [
+    { rel: 'icon', type: 'image/svg+xml' },
+    { rel: 'apple-touch-icon', type: 'image/png' },
+  ];
+  for (const { rel, type } of icons) {
+    const href = await page
+      .locator(`head link[rel="${rel}"]`)
+      .first()
+      .getAttribute('href');
+    expect(href, `<link rel="${rel}">`).toBeTruthy();
+
+    const response = await request.get(href ?? '');
+    expect(response.status()).toBe(200);
+    expect(response.headers()['content-type']).toContain(type);
+  }
+});
