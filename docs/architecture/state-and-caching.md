@@ -140,6 +140,16 @@ Every Server Action calls exactly one of these named helpers. The matrix above
 is the specification for what each one contains, and the helpers are unit-tested
 against it — so the table cannot drift from the code without a test failing.
 
+**As built (M1-B07):** `lib/server/cache/tags.ts` and
+`lib/server/cache/revalidate.ts` exist, with the first helper,
+`revalidateForProfileChange` (all ten tags — the matrix row plus `profile`). The
+helpers call **`updateTag`**, not the `revalidateTag` sketched above: in Next 16,
+`updateTag` is the Server Action API for read-your-own-writes and expires the
+entry at once, while `revalidateTag(tag, 'max')` may serve stale content while
+it revalidates — and a user who just changed their currency must not see the old
+one on reload. Each later milestone adds its helper and its matrix row to
+`INVALIDATES`.
+
 ## revalidateTag vs revalidatePath
 
 | Use | When |
