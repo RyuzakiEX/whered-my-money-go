@@ -67,7 +67,7 @@ a per-request id, each Server Action generates its own `requestId`
 |---|---|---|
 | `level` | ● | See [levels](#log-levels) |
 | `time` | ● | ISO 8601 UTC |
-| `requestId` | ● | ULID, generated in `middleware.ts`, threaded through the request |
+| `requestId` | ● | ULID, generated in `proxy.ts` and threaded through the request — *not yet: proxy.ts does not set one, and each Server Action generates its own* |
 | `userId` | when authenticated | **Opaque UUID only** — never email, never name |
 | `route` | ● | Pathname, **never** the query string (filters leak intent) |
 | `action` | for mutations | Server Action name |
