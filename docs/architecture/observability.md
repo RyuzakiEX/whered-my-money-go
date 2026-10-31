@@ -41,7 +41,10 @@ the constraint that failed is the bug, not the number.
 
 ## Log shape
 
-Structured JSON, one object per line, from `lib/server/logger.ts`.
+Structured JSON, one object per line, from `lib/server/logger.ts` (built in
+M1-B05, with the allowlisted `LoggableContext` below). Until middleware threads
+a per-request id, each Server Action generates its own `requestId`
+(`newRequestId()`).
 
 ```json
 {

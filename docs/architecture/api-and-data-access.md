@@ -355,6 +355,14 @@ export type ActionError =
   | { kind: 'unexpected';     correlationId: string };
 ```
 
+**As built (M1-B05):** `lib/server/result.ts` carries `validation`,
+`unauthenticated`, `rate_limited`, `unexpected`, and one kind this sketch lacked:
+`{ kind: 'auth_failed'; message }` — the single envelope every sign-in and
+password-reset failure returns, so the response never reveals whether an
+account exists ([security-model.md](../security/security-model.md#t7--account-enumeration)).
+`not_found` and `conflict` are added with the first action that can return
+them, rather than shipped unused.
+
 Why a union rather than exceptions:
 
 - **The call site is forced to handle failure.** `result.data` does not typecheck
