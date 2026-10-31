@@ -147,6 +147,28 @@ describe('signIn', () => {
     expect(await sessionUserId()).toBe(user.id);
   });
 
+  it('goes to a safe next after signing in, and never off-site', async () => {
+    const user = await createUser({ confirmed: true });
+    expect(
+      await redirectOf(() =>
+        actions.signIn({ email: user.email, password }, '/goals'),
+      ),
+    ).toBe('/goals');
+    jar.clear();
+    for (const next of [
+      'https://evil.example',
+      '//evil.example',
+      '/.//evil.example',
+    ]) {
+      expect(
+        await redirectOf(() =>
+          actions.signIn({ email: user.email, password }, next),
+        ),
+      ).toBe('/dashboard');
+      jar.clear();
+    }
+  });
+
   it('answers a wrong password, an unknown email, and an unconfirmed account identically', async () => {
     const user = await createUser({ confirmed: true });
     const unconfirmed = await createUser({ confirmed: false });
