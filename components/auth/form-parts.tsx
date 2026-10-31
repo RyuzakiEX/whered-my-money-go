@@ -6,7 +6,13 @@
 // form receives from its Server Action is described here structurally; the
 // page adapts the action's envelope into it (app/(auth)/form-state.ts).
 
-import { useEffect, useRef, type ComponentProps } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ComponentProps,
+} from 'react';
 
 import { Button } from '@/components/ui/button';
 import { cn } from '@/components/ui/cn';
@@ -32,6 +38,46 @@ export type FormAction = (
   state: FormState,
   formData: FormData,
 ) => Promise<FormState>;
+
+/**
+ * Field values held in state. React 19 resets an uncontrolled `<form action>`
+ * after every action — including one that returned an error — so a mistyped
+ * password wiped the email too (code review of #54). Controlled inputs are
+ * not reset, and still submit normally without JavaScript.
+ */
+export function useFieldValues<K extends string>(names: readonly K[]) {
+  const [values, setValues] = useState<Record<K, string>>(
+    () =>
+      Object.fromEntries(names.map((name) => [name, ''])) as Record<K, string>,
+  );
+  function bind(name: K) {
+    return {
+      value: values[name],
+      onChange: (event: ChangeEvent<HTMLInputElement>) => {
+        setValues((previous) => ({ ...previous, [name]: event.target.value }));
+      },
+    };
+  }
+  return bind;
+}
+
+/**
+ * Counts completed submissions. Used as the summary's `key`, so every result
+ * — even a second identical failure — mounts a fresh alert that is announced
+ * and focused again (code review of #54).
+ */
+export function useResultKey(state: object): number {
+  // React's "adjust state when an input changes" pattern: compared during
+  // render, so the new key applies before commit — one mount per result, not
+  // a render with the old key followed by a remount.
+  const [seen, setSeen] = useState(state);
+  const [count, setCount] = useState(0);
+  if (seen !== state) {
+    setSeen(state);
+    setCount(count + 1);
+  }
+  return count;
+}
 
 /**
  * A form-level message that takes focus when it appears, so a screen reader

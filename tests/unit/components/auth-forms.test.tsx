@@ -115,6 +115,41 @@ describe('LogInForm', () => {
     });
   });
 
+  it('re-announces and re-focuses the same message on a second failure', async () => {
+    // The same wrong password twice gives the same text; an alert whose text
+    // does not change is not announced again (code review of #54).
+    const user = userEvent.setup();
+    const action: FormAction = () =>
+      Promise.resolve({ message: 'Nope, try again.' });
+    render(<LogInForm action={action} next={null} />);
+    await user.type(screen.getByLabelText('Email'), 'ana@example.test');
+    await user.type(screen.getByLabelText('Password'), 'x');
+
+    await user.click(screen.getByRole('button', { name: 'Log in' }));
+    const first = await screen.findByText('Nope, try again.');
+    await user.click(screen.getByLabelText('Password')); // focus moves away
+    await user.click(screen.getByRole('button', { name: 'Log in' }));
+
+    await waitFor(() => {
+      const second = screen.getByText('Nope, try again.');
+      expect(second).not.toBe(first); // a fresh alert element: announced anew
+      expect(document.activeElement).toBe(second);
+    });
+  });
+
+  it('keeps the typed values when the server answers with an error', async () => {
+    const user = userEvent.setup();
+    const action: FormAction = () => Promise.resolve({ message: 'Nope.' });
+    render(<LogInForm action={action} next={null} />);
+    await user.type(screen.getByLabelText('Email'), 'ana@example.test');
+    await user.type(screen.getByLabelText('Password'), 'x');
+    await user.click(screen.getByRole('button', { name: 'Log in' }));
+    await screen.findByText('Nope.');
+    expect(screen.getByLabelText<HTMLInputElement>('Email').value).toBe(
+      'ana@example.test',
+    );
+  });
+
   it('carries next as a hidden field, and only when there is one', () => {
     const { container, rerender } = render(
       <LogInForm action={pendingAction().action} next="/goals" />,
