@@ -2,7 +2,8 @@
 // boundaries are only NavLink (active route), MobileNav (drawer state), and
 // ThemeToggle — see docs/architecture/frontend-architecture.md.
 //
-// Auth is not enforced yet; the (app) group gains its redirect in M1.
+// Signed-out visitors never reach it: proxy.ts redirects them to /login
+// (M1-B06). The layout itself checks the session too from M1-F04.
 
 import type { ReactNode } from 'react';
 

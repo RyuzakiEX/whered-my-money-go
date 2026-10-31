@@ -33,7 +33,7 @@ Three groups, three layouts, three different auth postures:
 | `(auth)` | Public, **redirects if signed in** | Centred card, no nav | `/login`, `/sign-up`, `/reset-password` |
 | `(app)` | **Required**, redirects to `/login?next=` | Sidebar shell | The nine app routes |
 
-The parentheses keep group names out of the URL. `middleware.ts` enforces both
+The parentheses keep group names out of the URL. `proxy.ts` enforces both
 redirect directions, and both are integration-tested (`M1-B06`) — an
 authenticated user landing on `/login` is as much a bug as an anonymous user
 reaching `/dashboard`.

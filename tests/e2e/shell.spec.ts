@@ -1,10 +1,18 @@
 import { expect, test } from '@playwright/test';
 
+import { signInAsNewUser } from './session';
+
 /**
  * The app shell's breakpoint — the one M0-F02 behaviour jsdom cannot check,
  * because jsdom has no layout. The drawer's own behaviour (Escape, backdrop,
  * focus trap) is covered in tests/unit/components/shell.test.tsx.
+ *
+ * App pages need a session since M1-B06, so every test signs a fresh user in.
  */
+
+test.beforeEach(async ({ context, baseURL }) => {
+  await signInAsNewUser(context, baseURL ?? 'http://localhost:3000');
+});
 
 test.describe('desktop (1280px)', () => {
   test.use({ viewport: { width: 1280, height: 800 } });

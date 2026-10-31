@@ -25,7 +25,7 @@ between.
      ▼
 ┌─────────────────────────────────────────────┐
 │  Vercel — Next.js App Router                │
-│  • middleware.ts (session refresh, guards)  │
+│  • proxy.ts (session refresh, guards)       │
 │  • Server Components (reads)                │
 │  • Server Actions (writes)                  │
 │  • lib/core (pure domain math)              │
@@ -51,7 +51,7 @@ one deployable unit.
 | Container | Owns | Must never |
 |---|---|---|
 | **Browser** | Rendering, interaction, optimistic UI, chart tooltips | Hold a secret; be trusted for identity, ownership, or money math |
-| **middleware.ts** | Refreshing the Supabase session cookie; redirecting by auth state | Contain business logic or database queries |
+| **proxy.ts** (Next 16's name for middleware) | Refreshing the Supabase session cookie; redirecting by auth state | Contain business logic or database queries |
 | **Server Components** | Reading data via RLS-scoped queries; composing pages | Mutate data; call a Server Action |
 | **Server Actions** | Validating input, re-checking ownership, writing, revalidating cache | Trust any client-supplied `user_id` |
 | **`lib/core`** | All financial computation — Safe to Spend, timeline, forecasts | Do I/O, read the clock, read env vars |
@@ -85,7 +85,7 @@ Three consequences worth stating:
 ```text
 GET /dashboard
    │
-   ├─▶ middleware.ts
+   ├─▶ proxy.ts
    │     refresh Supabase session cookie
    │     no session? → redirect /login?next=/dashboard
    │
@@ -141,7 +141,7 @@ Sign-up / login  →  Server Action  →  Supabase Auth (GoTrue)
                                              └─ seed default categories (spec §7)
 
 Every subsequent request:
-   middleware.ts refreshes the cookie before it expires
+   proxy.ts refreshes the cookie before it expires
    (app)/**  + no session  → /login?next=<path>
    (auth)/** + session     → /dashboard
 ```
