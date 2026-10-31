@@ -313,6 +313,52 @@ describe('updatePassword', () => {
     expect(await sessionUserId()).toBe(user.id);
   });
 
+  it('accepts the session the emailed link creates (PKCE code exchange)', async () => {
+    // The path a real user takes: the action stores the PKCE verifier in the
+    // cookie jar, the email's link verifies and redirects with a code, and
+    // /auth/callback exchanges it. That session's amr method is `recovery`,
+    // not the `otp` the token-hash path above yields — missing it refused
+    // every genuine reset until M1-F03's E2E caught it.
+    const user = await createUser({ confirmed: true });
+    await actions.requestPasswordReset({ email: user.email });
+
+    let link: string | undefined;
+    for (let attempt = 0; attempt < 20 && !link; attempt++) {
+      const search = await fetch(
+        `http://127.0.0.1:54324/api/v1/search?query=${encodeURIComponent(`to:"${user.email}"`)}`,
+      );
+      const { messages } = (await search.json()) as {
+        messages: { ID: string }[];
+      };
+      const id = messages[0]?.ID;
+      if (id) {
+        const message = await fetch(
+          `http://127.0.0.1:54324/api/v1/message/${id}`,
+        );
+        const { Text } = (await message.json()) as { Text: string };
+        link = /https?:\/\/\S+\/auth\/v1\/verify\?\S+/.exec(Text)?.[0];
+      }
+      if (!link) await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    if (!link) throw new Error('no reset email');
+
+    const verified = await fetch(link, { redirect: 'manual' });
+    const code = new URL(
+      verified.headers.get('location') ?? '',
+    ).searchParams.get('code');
+    const client = await createServerSupabaseClient();
+    const exchanged = await client.auth.exchangeCodeForSession(code ?? '');
+    expect(exchanged.error).toBeNull();
+
+    const to = await redirectOf(() =>
+      actions.updatePassword({
+        password: 'newpass99',
+        confirmPassword: 'newpass99',
+      }),
+    );
+    expect(to).toBe('/dashboard');
+  });
+
   it('reports a mismatched confirmation on the confirmation field', async () => {
     const result = await actions.updatePassword({
       password: 'newpass99',

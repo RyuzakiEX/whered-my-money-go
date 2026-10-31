@@ -42,13 +42,19 @@ export async function updateSession(
       getAll() {
         return request.cookies.getAll();
       },
-      setAll(cookiesToSet) {
+      setAll(cookiesToSet, headers) {
         for (const { name, value } of cookiesToSet) {
           request.cookies.set(name, value);
         }
         response = NextResponse.next({ request });
         for (const { name, value, options } of cookiesToSet) {
           response.cookies.set(name, value, options);
+        }
+        // Cache-Control: no-store (and friends), supplied by @supabase/ssr
+        // with every auth-cookie write. Without them a CDN could cache a
+        // response carrying one user's fresh session and serve it to another.
+        for (const [key, value] of Object.entries(headers)) {
+          response.headers.set(key, value);
         }
       },
     },
@@ -65,6 +71,11 @@ export function redirectWithCookies(to: URL, from: NextResponse): NextResponse {
   const redirect = NextResponse.redirect(to);
   for (const cookie of from.cookies.getAll()) {
     redirect.cookies.set(cookie);
+  }
+  // Carry the no-cache headers too: a redirect can rotate the session.
+  for (const key of ['cache-control', 'expires', 'pragma']) {
+    const value = from.headers.get(key);
+    if (value !== null) redirect.headers.set(key, value);
   }
   return redirect;
 }

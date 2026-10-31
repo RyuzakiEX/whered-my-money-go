@@ -188,11 +188,19 @@ export async function requestPasswordReset(
 const RECOVERY_WINDOW_SECONDS = 3600;
 
 /**
- * True when the session came from a password-recovery link in the last hour.
- * Recovery-link sessions carry `amr: [{ method: 'otp' }]`; a password login
- * carries `method: 'password'` (observed against the local stack, M1-B05).
- * The MVP has no other OTP sign-in, so `otp` means "came from the link".
+ * Methods a password-recovery link signs in with, observed against the local
+ * stack. The emailed link (PKCE: verify, then /auth/callback exchanges the
+ * code) yields `recovery`; verifying the link's token hash directly yields
+ * `otp`. A password login yields `password`, which is refused. The MVP has no
+ * other OTP sign-in, so `otp` also means "came from the link".
+ *
+ * `recovery` was missing at first: the integration test used the token-hash
+ * path, and only M1-F03's E2E through the real email showed that genuine
+ * resets were being refused.
  */
+const RECOVERY_METHODS: ReadonlySet<string> = new Set(['recovery', 'otp']);
+
+/** True when the session came from a password-recovery link in the last hour. */
 function isRecentRecovery(
   amr: readonly (string | { method: string; timestamp: number })[] | undefined,
 ): boolean {
@@ -202,7 +210,7 @@ function isRecentRecovery(
       // A bare string (RFC 8176 form) has no timestamp, so its age cannot be
       // checked: not accepted.
       typeof entry !== 'string' &&
-      entry.method === 'otp' &&
+      RECOVERY_METHODS.has(entry.method) &&
       now - entry.timestamp <= RECOVERY_WINDOW_SECONDS,
   );
 }
