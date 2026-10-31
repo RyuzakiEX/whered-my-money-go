@@ -50,9 +50,11 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Everything except build assets, image optimisation, and static files
-    // (icons, images): those need no session, and running auth on them
-    // would cost a round trip per asset.
-    '/((?!_next/static|_next/image|favicon\\.ico|icon|apple-icon|robots\\.txt|sitemap\\.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
+    // Everything except build assets, image optimisation, and the named
+    // public files (icons, robots, sitemap): those need no session. Each
+    // exclusion is anchored (code review of #52): a bare `icon` prefix or a
+    // blanket `.png` rule would also skip /iconography or a protected
+    // /reports/chart.png, leaving it unprotected.
+    '/((?!_next/static/|_next/image|favicon\\.ico$|(?:apple-)?icon\\d*\\.(?:svg|png|ico)$|robots\\.txt$|sitemap\\.xml$).*)',
   ],
 };

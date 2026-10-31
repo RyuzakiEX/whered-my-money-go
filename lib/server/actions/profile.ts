@@ -31,7 +31,19 @@ export async function updateProfile(
   const requestId = newRequestId();
 
   const supabase = await createServerSupabaseClient();
-  const { data: claimsData } = await supabase.auth.getClaims();
+  const { data: claimsData, error: claimsError } =
+    await supabase.auth.getClaims();
+  if (claimsError) {
+    // Auth itself failed (outage, key fetch). Not "signed out": that would
+    // send the user to log in again for nothing, and leave no trace here.
+    logger.error('profile.auth_failed', {
+      requestId,
+      action: 'updateProfile',
+      outcome: 'failure',
+      errorCode: claimsError.code ?? 'unknown',
+    });
+    return fail({ kind: 'unexpected', correlationId: requestId });
+  }
   const userId = claimsData?.claims.sub;
   if (!userId) return fail({ kind: 'unauthenticated' });
 

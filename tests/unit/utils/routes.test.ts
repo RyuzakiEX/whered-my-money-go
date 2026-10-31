@@ -61,6 +61,12 @@ describe('safeNextPath', () => {
     ['/goals', '/goals'],
     ['/transactions?month=2026-09', '/transactions?month=2026-09'],
     ['/settings/profile#name', '/settings/profile#name'],
+    // An encoded slash in a query VALUE is data, not a path trick (code review
+    // of #52): refusing it dropped a filtered view on login.
+    [
+      '/transactions?category=food%2Fdrink',
+      '/transactions?category=food%2Fdrink',
+    ],
   ])('keeps the same-origin path %j', (next, expected) => {
     expect(safeNextPath(next)).toBe(expected);
   });
@@ -85,5 +91,22 @@ describe('safeNextPath', () => {
     [null, 'absent'],
   ])('rejects %j (%s)', (next) => {
     expect(safeNextPath(next)).toBeNull();
+  });
+});
+
+describe('every app page is protected', () => {
+  it('covers each route folder under app/(app), not just the nav', async () => {
+    // Drift guard (code review of #52): the nav test cannot see a page that
+    // is not in the nav — an onboarding step, an import screen.
+    const { readdirSync, statSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const root = 'app/(app)';
+    const routes = readdirSync(root).filter((entry) =>
+      statSync(join(root, entry)).isDirectory(),
+    );
+    expect(routes.length).toBeGreaterThan(0);
+    for (const route of routes) {
+      expect(isProtectedPath(`/${route}`), `/${route}`).toBe(true);
+    }
   });
 });
