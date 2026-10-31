@@ -111,6 +111,7 @@ specifically attempts a foreign-account insert and asserts failure (`M3-B04`).
 | Sign-out invalidates server-side |
 | **A stolen session cannot change the password through the app** (M1-B05): `updatePassword` accepts only a session from a password-recovery link in the last hour (`amr` method `recovery` from the emailed link, or `otp` from its token hash; read through the verified `getClaims()`). An ordinary password login is refused |
 | Changing the password revokes every other session's refresh token — Supabase Auth does this itself (verified by test) |
+| **An emailed link signs in only on a button press** (security review of #55): `/auth/confirm` renders a Continue button and verifies nothing on GET; `confirmEmailLink`, a same-origin Server Action POST, spends the token. Opening the link cannot log a victim into an attacker's account (login CSRF), and mail scanners that pre-open links cannot burn the one-time token. If someone is already signed in, the page says so before switching |
 | `secure_password_change` on (local `config.toml`; preview `security_update_password_require_reauthentication`): Auth refuses a direct password change from a session that is not recent |
 
 **Residual risk, stated plainly.** The anon key is public, so a session token

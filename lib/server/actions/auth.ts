@@ -27,6 +27,7 @@ import {
 import { createServerSupabaseClient } from '@/lib/server/supabase/server';
 import { DEFAULT_SIGNED_IN_PATH, safeNextPath } from '@/lib/utils/routes';
 import {
+  emailLinkSchema,
   passwordResetRequestSchema,
   passwordUpdateSchema,
   signInSchema,
@@ -229,4 +230,50 @@ export async function updatePassword(
     userId: claims.sub,
   });
   redirect('/dashboard');
+}
+
+/**
+ * Completes an emailed auth link (M1-F03). Called by the Continue button on
+ * /auth/confirm — never by merely opening the link (security review of #55):
+ *
+ *  - Login CSRF: an attacker could otherwise send a victim the link for the
+ *    ATTACKER's own reset, and one click would sign the victim into the
+ *    attacker's account, where they might enter their own financial data.
+ *  - Link scanners: mail systems that pre-open links would spend the one-time
+ *    token before the user ever clicked.
+ *
+ * A Server Action is a same-origin POST (Next checks the Origin), so a
+ * cross-site page cannot submit it.
+ */
+export async function confirmEmailLink(input: unknown): Promise<never> {
+  const parsed = emailLinkSchema.safeParse(input);
+  const linkFailed = '/reset-password?link=expired';
+  if (!parsed.success) redirect(linkFailed);
+  const { tokenHash, type, code, next } = parsed.data;
+  const requestId = newRequestId();
+
+  const supabase = await createServerSupabaseClient();
+  let error: { code?: string | undefined } | null;
+  if (tokenHash && type) {
+    ({ error } = await supabase.auth.verifyOtp({
+      type,
+      token_hash: tokenHash,
+    }));
+  } else if (code) {
+    // Supabase's default email: works only in the browser that asked (PKCE).
+    ({ error } = await supabase.auth.exchangeCodeForSession(code));
+  } else {
+    redirect(linkFailed);
+  }
+
+  if (error) {
+    logger.warn('auth.confirm_failed', {
+      requestId,
+      action: 'confirmEmailLink',
+      outcome: 'failure',
+      errorCode: error.code ?? 'unknown',
+    });
+    redirect(linkFailed);
+  }
+  redirect(safeNextPath(next) ?? DEFAULT_SIGNED_IN_PATH);
 }

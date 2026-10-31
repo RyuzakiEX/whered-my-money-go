@@ -348,12 +348,17 @@ describe('updatePassword', () => {
     expect(new URL(link).searchParams.get('type')).toBe('recovery');
 
     jar.clear(); // another device: no cookies from the request
-    const { GET } = await import('@/app/auth/confirm/route');
-    const { NextRequest } = await import('next/server');
-    const confirmed = await GET(new NextRequest(link));
-    expect(new URL(confirmed.headers.get('location') ?? '').pathname).toBe(
-      '/reset-password/update',
+    // Opening the link renders /auth/confirm, which verifies nothing; the
+    // Continue button submits its parameters to confirmEmailLink.
+    const params = new URL(link).searchParams;
+    const confirmedTo = await redirectOf(() =>
+      actions.confirmEmailLink({
+        tokenHash: params.get('token_hash') ?? '',
+        type: params.get('type') ?? '',
+        next: params.get('next') ?? '',
+      }),
     );
+    expect(confirmedTo).toBe('/reset-password/update');
 
     const to = await redirectOf(() =>
       actions.updatePassword({
@@ -364,25 +369,38 @@ describe('updatePassword', () => {
     expect(to).toBe('/dashboard');
   });
 
-  it('refuses the same emailed link a second time', async () => {
+  it('spends the link only on Continue — opening it verifies nothing', async () => {
+    // Security review of #55: a GET that signs in enables login CSRF, and
+    // mail scanners that pre-open links would burn the one-time token.
     const user = await createUser({ confirmed: true });
     const link = await admin.auth.admin.generateLink({
       type: 'recovery',
       email: user.email,
     });
     if (link.error) throw link.error;
-    const url = `http://localhost:3000/auth/confirm?next=/reset-password/update&token_hash=${link.data.properties.hashed_token}&type=recovery`;
-    const { GET } = await import('@/app/auth/confirm/route');
-    const { NextRequest } = await import('next/server');
+    const input = {
+      tokenHash: link.data.properties.hashed_token,
+      type: 'recovery',
+      next: '/reset-password/update',
+    };
 
-    const first = await GET(new NextRequest(url));
-    expect(new URL(first.headers.get('location') ?? '').pathname).toBe(
+    // "Open" the link twice: render the page, as a scanner would.
+    const { default: ConfirmPage } = await import('@/app/auth/confirm/page');
+    const searchParams = Promise.resolve({
+      token_hash: input.tokenHash,
+      type: 'recovery',
+      next: input.next,
+    });
+    await ConfirmPage({ searchParams });
+    await ConfirmPage({ searchParams });
+    expect(jar.size).toBe(0); // no session was created by viewing
+
+    // The first Continue still works; the second is refused: single use.
+    expect(await redirectOf(() => actions.confirmEmailLink(input))).toBe(
       '/reset-password/update',
     );
     jar.clear();
-    const second = await GET(new NextRequest(url));
-    const location = new URL(second.headers.get('location') ?? '');
-    expect(`${location.pathname}${location.search}`).toBe(
+    expect(await redirectOf(() => actions.confirmEmailLink(input))).toBe(
       '/reset-password?link=expired',
     );
   });

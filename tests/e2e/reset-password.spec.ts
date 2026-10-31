@@ -39,6 +39,17 @@ async function resetLinkFor(to: string): Promise<string> {
   throw new Error(`No reset email reached Mailpit for ${to}`);
 }
 
+/**
+ * Open an emailed link and press Continue. Opening alone verifies nothing
+ * (security review of #55): the token is spent only by the button.
+ */
+async function openResetLink(page: Page, link: string) {
+  await page.goto(link);
+  await page
+    .getByRole('button', { name: 'Continue to choose a new password' })
+    .click();
+}
+
 async function requestReset(page: Page, email: string) {
   await page.goto('/reset-password');
   await page.getByLabel('Email').fill(email);
@@ -53,7 +64,11 @@ for (const width of [1280, 360]) {
   test.describe(`${String(width)}px`, () => {
     test.use({ viewport: { width, height: 800 } });
 
-    for (const path of ['/reset-password', '/reset-password/update']) {
+    for (const path of [
+      '/reset-password',
+      '/reset-password/update',
+      '/auth/confirm?token_hash=x&type=recovery&next=/reset-password/update',
+    ]) {
       test(`${path} is axe-clean with no horizontal scroll`, async ({
         page,
       }) => {
@@ -90,7 +105,7 @@ test('resets the password through the emailed link, then logs in with it', async
   const user = await createUser();
   await requestReset(page, user.email);
 
-  await page.goto(await resetLinkFor(user.email));
+  await openResetLink(page, await resetLinkFor(user.email));
   await expect(page).toHaveURL(/\/reset-password\/update$/, AFTER_SUBMIT);
 
   await page.getByLabel('New password').fill('brand-new-pass-1');
@@ -121,7 +136,7 @@ test('works when the email is opened on a different device', async ({
 
   const phone = await browser.newContext();
   const other = await phone.newPage();
-  await other.goto(link);
+  await openResetLink(other, link);
   await expect(other).toHaveURL(/\/reset-password\/update$/, AFTER_SUBMIT);
   await other.getByLabel('New password').fill('phone-pass-1');
   await other.getByLabel('Type it again').fill('phone-pass-1');
@@ -144,13 +159,13 @@ test('a link used twice leads back to a fresh request, not an error', async ({
 
   const first = await browser.newContext();
   const firstPage = await first.newPage();
-  await firstPage.goto(link);
+  await openResetLink(firstPage, link);
   await expect(firstPage).toHaveURL(/\/reset-password\/update$/, AFTER_SUBMIT);
   await first.close();
 
   const second = await browser.newContext();
   const secondPage = await second.newPage();
-  await secondPage.goto(link);
+  await openResetLink(secondPage, link);
   await expect(secondPage.getByText(/expired or was already used/)).toBeVisible(
     AFTER_SUBMIT,
   );
@@ -158,6 +173,30 @@ test('a link used twice leads back to a fresh request, not an error', async ({
     secondPage.getByRole('button', { name: 'Send me a reset link' }),
   ).toBeVisible();
   await second.close();
+});
+
+test('opening the link, even twice, does not use it up', async ({
+  browser,
+}) => {
+  // Mail scanners pre-open links; a GET that verified would burn the token
+  // before the user clicked (security review of #55).
+  const user = await createUser();
+  const requester = await browser.newPage();
+  await requestReset(requester, user.email);
+  const link = await resetLinkFor(user.email);
+  await requester.close();
+
+  const scanner = await browser.newContext();
+  const scan = await scanner.newPage();
+  await scan.goto(link);
+  await scan.goto(link);
+  await scanner.close();
+
+  const person = await browser.newContext();
+  const page = await person.newPage();
+  await openResetLink(page, link);
+  await expect(page).toHaveURL(/\/reset-password\/update$/, AFTER_SUBMIT);
+  await person.close();
 });
 
 test('an ordinary signed-in session is not offered the new-password form', async ({
@@ -180,7 +219,7 @@ test('shows a mismatched confirmation on the confirmation field', async ({
 }) => {
   const user = await createUser();
   await requestReset(page, user.email);
-  await page.goto(await resetLinkFor(user.email));
+  await openResetLink(page, await resetLinkFor(user.email));
   await expect(page).toHaveURL(/\/reset-password\/update$/, AFTER_SUBMIT);
 
   await page.getByLabel('New password').fill('brand-new-pass-1');
