@@ -33,9 +33,9 @@ Production are Vercel environment scopes.
 
 | Variable | Local (`.env.local`) | Preview (Vercel) | Production (Vercel) | Secret? |
 |---|---|---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | `http://127.0.0.1:54321` | `https://qvqamjyjjcnvjsflvrsb.supabase.co` | *unset until M9-B06* | No |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | local fixed demo key | preview project's anon key | *unset until M9-B06* | No |
-| `NEXT_PUBLIC_SITE_URL` | `http://localhost:3000` | *unset — nothing reads it yet* | *unset until M9-B06* | No |
+| `NEXT_PUBLIC_SUPABASE_URL` | `http://127.0.0.1:54321` | `https://qvqamjyjjcnvjsflvrsb.supabase.co` | `https://xseokwrfhpsdhvxwhfzd.supabase.co` | No |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | local fixed demo key | preview project's anon key | production project's anon key | No |
+| `NEXT_PUBLIC_SITE_URL` | `http://localhost:3000` | *unset — `VERCEL_URL` is used* | *unset — `VERCEL_URL` is used* | No |
 | `SUPABASE_SERVICE_ROLE_KEY` | local fixed demo key | **never set** | **never set** | **Yes** |
 | `SUPABASE_DB_URL` | `postgresql://postgres:postgres@127.0.0.1:54322/postgres` | **never set** | **never set** | **Yes** |
 
@@ -57,9 +57,16 @@ curl -sS "https://api.vercel.com/v10/projects/$PROJECT_ID/env?teamId=$TEAM_ID" \
   | jq -r '.envs[] | "\(.key)\t\(.target | join(","))"'
 ```
 
-The expected output is exactly the Preview rows above. As recorded in M0-B10:
-`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`, both `preview`,
-and nothing else.
+The expected output is exactly two variables per hosted scope:
+`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`, once for
+`preview` and once for `production`, each naming its own project — and nothing
+else (no `service_role`, no `SUPABASE_DB_URL`). Recorded 2026-10-31.
+
+**A Vercel build fails without them** (`next.config.ts`, via
+`lib/utils/build-env.ts`). On 2026-10-31 production deployed "successfully"
+with an empty Production scope and answered 500 on every page: `proxy.ts`
+needs these on every request, and `NEXT_PUBLIC_*` values are baked in at
+build time. A failed build leaves the last good deployment live instead.
 
 `NEXT_PUBLIC_*` variables are compiled into the client bundle and are public
 forever. Anything secret must not carry that prefix — see
@@ -70,11 +77,28 @@ forever. Anything secret must not carry that prefix — see
 | Environment | Project | Ref | Region | Created |
 |---|---|---|---|---|
 | Preview | `whered-my-money-go-preview` | `qvqamjyjjcnvjsflvrsb` | `ap-southeast-1` (Singapore) | M0-B10 |
-| Production | *not yet provisioned* | — | — | M9-B06 |
+| Production | `whered-my-money-go-prod` | `xseokwrfhpsdhvxwhfzd` | `ap-southeast-1` (Singapore) | 2026-10-31, ahead of M9-B06, after production 500'd without a backend |
 
 Both use the free tier, which allows two active projects per organization —
-exactly one per hosted environment. The preview database password is not stored
-in the repository or in Vercel; it lives with the maintainer.
+exactly one per hosted environment. Neither database password is stored in the
+repository or in Vercel; they live with the maintainer.
+
+**The checkout is linked to preview.** `npx supabase db push --linked` targets
+preview. To migrate production, link it deliberately, push, verify RLS, and
+link back:
+
+```bash
+npx supabase link --project-ref xseokwrfhpsdhvxwhfzd   # production
+npx supabase db push --linked --dry-run                # read the list first
+npx supabase db push --linked
+npx supabase link --project-ref qvqamjyjjcnvjsflvrsb   # back to preview
+```
+
+**Production Auth** (set 2026-10-31): site URL and redirect allowlist are the
+production URL only; password minimum 8 with letters and digits; recent login
+required to change a password. **Email confirmation is ON** (Supabase's
+default) — with the built-in mailer, that means only the project's team can
+finish signing up. Turning it off, as on preview, is the maintainer's call.
 
 The local Supabase stack prints the same fixed anon and service keys for every
 developer on earth. They are demo values on a stack that is not
