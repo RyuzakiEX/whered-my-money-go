@@ -14,7 +14,7 @@ messages** that never reveal whether an email is registered, and the rule that
 
 ## Exit criteria
 
-- [ ] Sign up → dashboard → log out → log back in works against local Supabase and a preview deployment — *local: M1-B08's `tests/e2e/auth.spec.ts`, three consecutive passes. Preview: blocked while the preview project requires email confirmation — the maintainer's decision (docs/ops/environments.md)*
+- [ ] Sign up → dashboard → log out → log back in works against local Supabase and a preview deployment — *local: M1-B08's `tests/e2e/auth.spec.ts`, three consecutive passes. Preview: unblocked 2026-10-31 — the maintainer turned email confirmation off on the preview project (docs/ops/environments.md); still to be run on a preview deployment once the M1 PRs are merged*
 - [x] A `profiles` row is created automatically on `auth.users` insert with currency `PHP` and timezone `Asia/Manila` — *M1-B01 (#46); tested locally and on the preview database*
 - [x] `profiles` has RLS with a passing pgTAP isolation test — *M1-B02/B03 (#46, #48); 17/17 in CI*
 - [x] The reusable "table is user-isolated" pgTAP assertion exists, is documented, and is used by the `profiles` test — *M1-B03 (#48); `supabase/tests/rls/README.md`*
