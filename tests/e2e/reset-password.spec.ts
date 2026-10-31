@@ -6,8 +6,8 @@ import { createUser } from './session';
 /**
  * M1-F03: password reset, end to end through the real email. Mailpit catches
  * local and CI mail (workflow/01-local-setup.md), so the test follows the
- * exact link a user would click — including Auth's verify redirect and the
- * /auth/callback code exchange.
+ * exact link a user would click: /auth/confirm with a token hash, which
+ * works from any device (code review of #55).
  */
 
 const MAILPIT = 'http://127.0.0.1:54324';
@@ -27,8 +27,11 @@ async function resetLinkFor(to: string): Promise<string> {
     const id = messages[0]?.ID;
     if (id) {
       const message = await fetch(`${MAILPIT}/api/v1/message/${id}`);
-      const { Text } = (await message.json()) as { Text: string };
-      const link = /https?:\/\/\S+\/auth\/v1\/verify\?\S+/.exec(Text)?.[0];
+      const { HTML } = (await message.json()) as { HTML: string };
+      // The template's link: /auth/confirm with a token hash (M1-F03).
+      const link = /href="([^"]*\/auth\/confirm[^"]*)"/
+        .exec(HTML)?.[1]
+        ?.replaceAll('&amp;', '&');
       if (link) return link;
     }
     await new Promise((resolve) => setTimeout(resolve, 500));
@@ -105,26 +108,71 @@ test('resets the password through the emailed link, then logs in with it', async
   await fresh.close();
 });
 
-test('a link used twice leads back to a fresh request, not an error', async ({
+test('works when the email is opened on a different device', async ({
   page,
   browser,
 }) => {
+  // Requested in one browser, opened in another with no shared cookies: the
+  // common laptop-then-phone case, which the old PKCE link always failed
+  // (code review of #55).
   const user = await createUser();
   await requestReset(page, user.email);
   const link = await resetLinkFor(user.email);
 
-  await page.goto(link);
-  await expect(page).toHaveURL(/\/reset-password\/update$/, AFTER_SUBMIT);
+  const phone = await browser.newContext();
+  const other = await phone.newPage();
+  await other.goto(link);
+  await expect(other).toHaveURL(/\/reset-password\/update$/, AFTER_SUBMIT);
+  await other.getByLabel('New password').fill('phone-pass-1');
+  await other.getByLabel('Type it again').fill('phone-pass-1');
+  await other.getByRole('button', { name: 'Save my new password' }).click();
+  await expect(other).toHaveURL(/\/dashboard$/, AFTER_SUBMIT);
+  await phone.close();
+});
 
-  const second = await browser.newPage();
-  await second.goto(link);
-  await expect(second.getByText(/expired or was already used/)).toBeVisible(
+test('a link used twice leads back to a fresh request, not an error', async ({
+  browser,
+}) => {
+  // Each use in a FRESH browser: with a token-hash link a fresh browser can
+  // redeem a valid link, so the second one failing proves single use — not a
+  // missing cookie (code review of #55).
+  const user = await createUser();
+  const requester = await browser.newPage();
+  await requestReset(requester, user.email);
+  const link = await resetLinkFor(user.email);
+  await requester.close();
+
+  const first = await browser.newContext();
+  const firstPage = await first.newPage();
+  await firstPage.goto(link);
+  await expect(firstPage).toHaveURL(/\/reset-password\/update$/, AFTER_SUBMIT);
+  await first.close();
+
+  const second = await browser.newContext();
+  const secondPage = await second.newPage();
+  await secondPage.goto(link);
+  await expect(secondPage.getByText(/expired or was already used/)).toBeVisible(
     AFTER_SUBMIT,
   );
   await expect(
-    second.getByRole('button', { name: 'Send me a reset link' }),
+    secondPage.getByRole('button', { name: 'Send me a reset link' }),
   ).toBeVisible();
   await second.close();
+});
+
+test('an ordinary signed-in session is not offered the new-password form', async ({
+  page,
+  context,
+  baseURL,
+}) => {
+  // The form would always fail for it (code review of #55).
+  const { signInAsNewUser } = await import('./session');
+  await signInAsNewUser(context, baseURL ?? 'http://localhost:3000');
+  await page.goto('/reset-password/update');
+  await expect(page.getByLabel('New password')).toHaveCount(0);
+  await expect(
+    page.getByRole('link', { name: 'Ask for a fresh reset link' }),
+  ).toBeVisible();
 });
 
 test('shows a mismatched confirmation on the confirmation field', async ({

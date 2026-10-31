@@ -8,6 +8,8 @@ import {
   ErrorSummary,
   SubmitButton,
   TextField,
+  useFieldValues,
+  useResultKey,
   type FormAction,
   type FormState,
 } from './form-parts';
@@ -26,6 +28,8 @@ export function ResetRequestForm({ action }: { action: FormAction }) {
     action,
     {},
   );
+  const bind = useFieldValues(['email']);
+  const resultKey = useResultKey(state);
   const { onBlur, onSubmit, errorsFor } = useFieldValidation(
     passwordResetRequestSchema,
     state.fields,
@@ -50,9 +54,10 @@ export function ResetRequestForm({ action }: { action: FormAction }) {
       noValidate
       className="flex flex-col gap-5"
     >
-      <ErrorSummary message={state.message} />
+      <ErrorSummary key={resultKey} message={state.message} />
       <TextField
         name="email"
+        {...bind('email')}
         label="Email"
         type="email"
         autoComplete="email"

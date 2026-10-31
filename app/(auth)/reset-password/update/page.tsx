@@ -4,6 +4,7 @@ import Link from 'next/link';
 import type { FormState } from '@/components/auth/form-parts';
 import { NewPasswordForm } from '@/components/auth/new-password-form';
 import { updatePassword } from '@/lib/server/actions/auth';
+import { isRecentRecovery } from '@/lib/server/auth/recovery';
 import { createServerSupabaseClient } from '@/lib/server/supabase/server';
 import { pickFields } from '@/lib/utils/form-data';
 
@@ -33,7 +34,10 @@ async function updatePasswordFromForm(
 export default async function UpdatePasswordPage() {
   const supabase = await createServerSupabaseClient();
   const { data } = await supabase.auth.getClaims();
-  const signedIn = Boolean(data?.claims.sub);
+  // The same check updatePassword applies: an ordinary session, or a recovery
+  // older than an hour, would only get a form that always fails (code review
+  // of #55).
+  const fromRecoveryLink = isRecentRecovery(data?.claims.amr);
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center gap-6 p-6">
@@ -43,7 +47,7 @@ export default async function UpdatePasswordPage() {
           Make it a good one. Future-you will thank you.
         </p>
       </div>
-      {signedIn ? (
+      {fromRecoveryLink ? (
         <NewPasswordForm action={updatePasswordFromForm} />
       ) : (
         <div className="flex flex-col gap-3">
