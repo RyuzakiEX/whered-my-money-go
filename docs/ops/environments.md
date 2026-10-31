@@ -160,10 +160,14 @@ Ordered, because the ordering matters:
    Preview, set 2026-10-30 (M1-B05) through the Management API:
    `site_url` = the production URL; redirect allowlist =
    `https://*-jorges-projects-bfadb832.vercel.app/**` and the production URL;
-   password minimum 8, letters and digits. **Email confirmation is still ON**
-   on preview, so a preview sign-up waits for an email that the built-in
-   mailer sends only to the project's own team members, at 2 per hour —
-   whether to turn it off for previews is the maintainer's decision.
+   password minimum 8, letters and digits. **Email confirmation is OFF** on
+   preview (the maintainer's decision, 2026-10-31), matching the local stack:
+   Supabase's built-in mailer delivers only to the project's own team members,
+   at 2 per hour, so with confirmation on no visitor could finish signing up.
+   Consequence: password-reset emails on preview still reach only the team.
+   Real email for everyone needs a verified domain on a provider such as
+   Resend — Resend's `onboarding@resend.dev` test sender has the same
+   own-address-only limit. Production decides separately, at M9-B06.
 6. Deploy the app.
 7. Smoke test: sign up → add an account → add a transaction → check the
    dashboard → verify Safe to Spend computes.

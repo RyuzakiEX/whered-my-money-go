@@ -59,7 +59,10 @@ export const DEFAULT_SIGNED_IN_PATH = '/dashboard';
 export function safeNextPath(next: string | null | undefined): string | null {
   if (!next?.startsWith('/')) return null;
   if (next.startsWith('//') || next.includes('\\')) return null;
-  if (/%2f|%5c/i.test(next)) return null;
+  // Encoded slashes are a path trick only in the PATH; in a query value they
+  // are data (`?category=food%2Fdrink`), refusing them dropped a filtered view.
+  const pathOnly = next.split(/[?#]/)[0] ?? '';
+  if (/%2f|%5c/i.test(pathOnly)) return null;
 
   // Belt and braces: resolve against a fixed origin and require it unchanged.
   const base = 'https://same-origin.invalid';
