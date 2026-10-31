@@ -109,6 +109,20 @@ specifically attempts a foreign-account insert and asserts failure (`M3-B04`).
 | HTTPS everywhere (platform-enforced) |
 | No token in a URL, log, or error message ([observability.md](../architecture/observability.md#never-log-this)) |
 | Sign-out invalidates server-side |
+| **A stolen session cannot change the password through the app** (M1-B05): `updatePassword` accepts only a session from a password-recovery link in the last hour (`amr` method `recovery` from the emailed link, or `otp` from its token hash; read through the verified `getClaims()`). An ordinary password login is refused |
+| Changing the password revokes every other session's refresh token — Supabase Auth does this itself (verified by test) |
+| `secure_password_change` on (local `config.toml`; preview `security_update_password_require_reauthentication`): Auth refuses a direct password change from a session that is not recent |
+
+**Residual risk, stated plainly.** The anon key is public, so a session token
+can call Auth's `PUT /auth/v1/user` directly, bypassing the app's recovery-only
+rule. `secure_password_change` stops that only for sessions that are *not*
+recent: probed in M1-B05, a freshly created password session changed its
+password through the direct API with the setting on. So a **freshly stolen**
+session can still take an account over. Closing it needs Auth to require the
+current password or a reauthentication nonce for every change — no setting found
+for that as of M1-B05 — or an app-level password-change flow that verifies the
+current password before Auth is called, which a direct call would still skip.
+Revisit with M9's security review.
 
 ### T4 — Secret leakage
 
@@ -145,8 +159,33 @@ ignored. See
 *Probing which emails have accounts, via sign-up or password-reset responses.*
 
 Mitigation: **uniform responses.** "If that email has an account, we've sent a
-link" regardless. Identical timing and identical wording for sign-in failures
-whether the email exists or the password was wrong (`M1-B05`).
+link" regardless. Identical wording for sign-in failures whether the email
+exists or the password was wrong (`M1-B05`).
+
+As built in M1-B05 (`lib/server/actions/auth.ts`):
+
+| Path | Uniform? | Evidence |
+|---|---|---|
+| Sign-in | **Yes.** Wrong password, unknown email, and unconfirmed account return byte-identical envelopes | Integration test. Raw Auth answers the unconfirmed case differently (`email_not_confirmed`), which is exactly what the mapping hides |
+| Password reset | **Yes.** `{ ok: true }` whether or not the account exists | Integration test, plus Mailpit showing the real account did get the email |
+| Sign-up | **No, by nature** | With email confirmation off, signing up with a registered email fails while a new one succeeds. No wording hides that. The fix is email confirmation (Auth then answers both alike); deciding it for production is M9's |
+| Timing | **Not verified** | Auth may answer an unknown email faster than a wrong password. Not measured; mitigated, not closed, by the rate limits below |
+
+**Rate limiting posture (M1-B05).** No app-level limiter in the MVP; the
+credential endpoints rely on Supabase Auth's own per-IP limits. Values, from
+`supabase/config.toml` (local) and the preview project's Auth config (2026-10-30):
+
+| Limit | Value | Window |
+|---|---|---|
+| Sign-ups and sign-ins | 30 | 5 minutes, per IP |
+| Token verifications (OTP, magic link, recovery) | 30 | 5 minutes, per IP |
+| Token refreshes | 150 | 5 minutes, per IP |
+| Emails sent (reset, confirmation) | 2 | per hour, project-wide — only enforced with real SMTP, so not locally (Mailpit) |
+
+A limit hit returns `{ kind: 'rate_limited' }`. It is per-IP, not per-account,
+so reporting it reveals nothing about which emails exist. An app-level limiter
+(per-account lockout, CAPTCHA) is a post-MVP decision; Supabase supports
+`[auth.captcha]` when needed.
 
 ### T8 — Denial of service via expensive computation
 
