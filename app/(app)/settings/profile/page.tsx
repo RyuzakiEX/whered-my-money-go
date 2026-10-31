@@ -8,6 +8,7 @@ import {
 } from '@/components/settings/profile-form';
 import { updateProfile } from '@/lib/server/actions/profile';
 import { getProfile } from '@/lib/server/queries/profile';
+import { timeZoneOptions } from '@/lib/validation/timezone';
 
 export const metadata: Metadata = { title: 'Profile settings' };
 
@@ -36,13 +37,10 @@ async function saveProfile(values: ProfileValues): Promise<ProfileSaveResult> {
 
 export default async function ProfileSettingsPage() {
   const profile = await getProfile();
-  if (!profile) redirect('/login');
+  if (!profile) redirect('/auth/signout');
 
-  // This runtime's IANA zones, plus the saved one in case it is an alias.
-  const timezones = Array.from(
-    new Set([profile.timezone, ...Intl.supportedValuesOf('timeZone')]),
-  );
-
+  // The saved zone first, then common modern names this runtime omits.
+  const timezones = timeZoneOptions(profile.timezone);
   return (
     <div className="mx-auto flex w-full max-w-lg flex-col gap-6">
       <div className="flex flex-col gap-2">

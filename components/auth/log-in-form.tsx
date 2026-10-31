@@ -8,6 +8,8 @@ import {
   ErrorSummary,
   SubmitButton,
   TextField,
+  useFieldValues,
+  useResultKey,
   type FormAction,
   type FormState,
 } from './form-parts';
@@ -29,6 +31,8 @@ export function LogInForm({
     action,
     {},
   );
+  const bind = useFieldValues(['email', 'password']);
+  const resultKey = useResultKey(state);
   const { onBlur, onSubmit, errorsFor } = useFieldValidation(
     signInSchema,
     state.fields,
@@ -42,10 +46,11 @@ export function LogInForm({
       noValidate
       className="flex flex-col gap-5"
     >
-      <ErrorSummary message={state.message} />
+      <ErrorSummary key={resultKey} message={state.message} />
       {next ? <input type="hidden" name="next" value={next} /> : null}
       <TextField
         name="email"
+        {...bind('email')}
         label="Email"
         type="email"
         autoComplete="username"
@@ -54,6 +59,7 @@ export function LogInForm({
       />
       <TextField
         name="password"
+        {...bind('password')}
         label="Password"
         type="password"
         autoComplete="current-password"

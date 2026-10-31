@@ -16,15 +16,18 @@ vi.mock('next/navigation', () => ({
   },
 }));
 // The layout reads the profile and passes the sign-out action down (M1-F04).
+const profileStub = { current: true };
 vi.mock('@/lib/server/queries/profile', () => ({
   getProfile: () =>
-    Promise.resolve({
-      id: 'u-1',
-      email: 'ana@example.test',
-      displayName: 'Ana',
-      currency: 'PHP',
-      timezone: 'Asia/Manila',
-    }),
+    !profileStub.current
+      ? Promise.resolve(null)
+      : Promise.resolve({
+          id: 'u-1',
+          email: 'ana@example.test',
+          displayName: 'Ana',
+          currency: 'PHP',
+          timezone: 'Asia/Manila',
+        }),
   displayNameOf: (p: { displayName: string | null }) => p.displayName ?? 'You',
 }));
 vi.mock('@/lib/server/actions/auth', () => ({ signOut: vi.fn() }));
@@ -90,5 +93,18 @@ describe('app shell layout', () => {
     expect(
       screen.getAllByRole('button', { name: /add transaction/i }),
     ).toHaveLength(2);
+  });
+});
+
+describe('app shell without a profile', () => {
+  it('signs the session out instead of rendering or looping to /login', async () => {
+    // Code review of #56: a valid token with no profile row used to throw on
+    // every page; /login would bounce back here through the proxy.
+    profileStub.current = false;
+    const { default: AppLayout } = await import('@/app/(app)/layout');
+    await expect(AppLayout({ children: null })).rejects.toThrow(
+      'redirect /auth/signout',
+    );
+    profileStub.current = true;
   });
 });

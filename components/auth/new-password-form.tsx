@@ -8,6 +8,8 @@ import {
   ErrorSummary,
   SubmitButton,
   TextField,
+  useFieldValues,
+  useResultKey,
   type FormAction,
   type FormState,
 } from './form-parts';
@@ -19,6 +21,8 @@ export function NewPasswordForm({ action }: { action: FormAction }) {
     action,
     {},
   );
+  const bind = useFieldValues(['password', 'confirmPassword']);
+  const resultKey = useResultKey(state);
   const { onBlur, onSubmit, errorsFor } = useFieldValidation(
     passwordUpdateSchema,
     state.fields,
@@ -32,9 +36,10 @@ export function NewPasswordForm({ action }: { action: FormAction }) {
       noValidate
       className="flex flex-col gap-5"
     >
-      <ErrorSummary message={state.message} />
+      <ErrorSummary key={resultKey} message={state.message} />
       <TextField
         name="password"
+        {...bind('password')}
         label="New password"
         type="password"
         autoComplete="new-password"
@@ -44,6 +49,7 @@ export function NewPasswordForm({ action }: { action: FormAction }) {
       />
       <TextField
         name="confirmPassword"
+        {...bind('confirmPassword')}
         label="Type it again"
         type="password"
         autoComplete="new-password"
