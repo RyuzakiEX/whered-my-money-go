@@ -4,13 +4,13 @@
 //
 // Optimistic: the new values show as saved the moment you press Save. If the
 // action fails, React's useOptimistic drops the optimistic values when the
-// transition ends, so the previous ones come back, and the error is
-// announced. Validation uses the same schema as updateProfile.
+// transition ends, so the summary shows what is really saved again, and the
+// error is announced. The inputs keep the user's edits, so a field error sits
+// next to the value it describes and the user can fix and retry (code review
+// of #56). Validation uses the same schema as updateProfile.
 
 import {
-  useEffect,
   useOptimistic,
-  useRef,
   useState,
   useTransition,
   type SubmitEvent,
@@ -61,15 +61,6 @@ export function ProfileForm({
   const [status, setStatus] = useState('');
   const [pending, startTransition] = useTransition();
 
-  // After a failed save, put the inputs back to what is actually saved.
-  const rollbackTo = useRef<ProfileValues | null>(null);
-  useEffect(() => {
-    if (!pending && rollbackTo.current) {
-      setValues(rollbackTo.current);
-      rollbackTo.current = null;
-    }
-  }, [pending]);
-
   const dirty =
     values.displayName !== saved.displayName ||
     values.currency !== saved.currency ||
@@ -90,7 +81,6 @@ export function ProfileForm({
     }
     setFieldErrors({});
     const next = parsed.data;
-    const previous = saved;
 
     startTransition(async () => {
       showOptimistic(next);
@@ -100,7 +90,6 @@ export function ProfileForm({
         setValues(result.data);
         setStatus(SAVED);
       } else {
-        rollbackTo.current = previous;
         setFieldErrors(result.fields ?? {});
         setMessage(
           result.message ??

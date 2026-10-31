@@ -26,7 +26,9 @@ async function signOutFromForm(): Promise<void> {
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const profile = await getProfile();
-  if (!profile) redirect('/login');
+  // No profile with a live session: sign that session out, rather than
+  // redirect to /login, which the proxy would bounce straight back here.
+  if (!profile) redirect('/auth/signout');
 
   const account = (
     <AccountMenu

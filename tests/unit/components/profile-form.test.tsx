@@ -60,7 +60,7 @@ describe('ProfileForm', () => {
     expect((save as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it('shows the new values at once, then rolls them back and says so when the save fails', async () => {
+  it('shows the new values at once; on failure the summary rolls back, the edits stay, and it says so', async () => {
     const user = userEvent.setup();
     const { action, settle } = controlledAction();
     render(
@@ -85,15 +85,21 @@ describe('ProfileForm', () => {
       await Promise.resolve();
     });
 
-    // Rolled back: the summary and the inputs show the saved values again.
+    // Rolled back: the summary shows the saved values again...
     await waitFor(() => {
       expect(shown('name')).toBe('Ana');
     });
     expect(shown('currency')).toBe('PHP');
-    expect(screen.getByLabelText<HTMLInputElement>('Name').value).toBe('Ana');
+    // ...but the user's edits stay in the inputs, ready to fix and retry —
+    // throwing them away made a server field error point at the old value
+    // (code review of #56).
+    expect(screen.getByLabelText<HTMLInputElement>('Name').value).toBe('Bea');
     expect(screen.getByLabelText<HTMLSelectElement>('Currency').value).toBe(
-      'PHP',
+      'USD',
     );
+    expect(
+      screen.getByRole<HTMLButtonElement>('button', { name: 'Save' }).disabled,
+    ).toBe(false);
     // And the failure is announced.
     const alert = screen.getByRole('alert');
     expect(alert.textContent).toBe('The server said no.');

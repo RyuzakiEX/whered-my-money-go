@@ -7,6 +7,8 @@
 // infrastructure failure — reads do not return an envelope
 // (docs/architecture/api-and-data-access.md).
 
+import { cache } from 'react';
+
 import type { SupportedCurrency } from '@/lib/core/money/currency';
 import { createServerSupabaseClient } from '@/lib/server/supabase/server';
 
@@ -18,8 +20,17 @@ export interface Profile {
   timezone: string;
 }
 
-/** The signed-in user's profile, or null when there is no session. */
-export async function getProfile(): Promise<Profile | null> {
+/**
+ * The signed-in user's profile, or null when there is no session — or no
+ * profile row for it (a deleted user whose token is still valid, or a sign-up
+ * whose trigger failed). It used to throw on the missing row, which put an
+ * error on every app page (code review of #56); the layout now signs such a
+ * session out instead.
+ *
+ * Wrapped in React's cache(): the layout and the page both read the profile,
+ * and this makes that one verification and one query per request.
+ */
+export const getProfile = cache(async (): Promise<Profile | null> => {
   const supabase = await createServerSupabaseClient();
   const { data: claimsData } = await supabase.auth.getClaims();
   const claims = claimsData?.claims;
@@ -30,6 +41,8 @@ export async function getProfile(): Promise<Profile | null> {
     .select('id, display_name, currency, timezone')
     .eq('id', claims.sub)
     .single();
+  // PGRST116: `.single()` found no row.
+  if (error?.code === 'PGRST116') return null;
   if (error) throw new Error(`profile read failed: ${error.code}`);
 
   return {
@@ -40,7 +53,7 @@ export async function getProfile(): Promise<Profile | null> {
     currency: data.currency as SupportedCurrency,
     timezone: data.timezone,
   };
-}
+});
 
 /** What the shell calls the user: their name, else their email's local part. */
 export function displayNameOf(
