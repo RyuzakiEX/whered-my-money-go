@@ -164,6 +164,24 @@ describe('a session that expires mid-visit', () => {
     const before = expired.map((c) => c.value).join('');
     expect(rotated.map((c) => c.value).join('')).not.toBe(before);
   });
+
+  it('marks a response carrying rotated session cookies as uncacheable', async () => {
+    // @supabase/ssr hands setAll these headers with every auth-cookie write.
+    // Dropping them lets a CDN cache one user's fresh session and serve it to
+    // another (code review of #52).
+    const res = await proxy(
+      request('/dashboard', withExpiredAccessToken(sessionCookies)),
+    );
+    expect(res.headers.get('cache-control')).toMatch(/no-store/);
+  });
+
+  it('keeps the no-cache headers on a redirect that rotates cookies too', async () => {
+    const res = await proxy(
+      request('/login', withExpiredAccessToken(sessionCookies)),
+    );
+    expect(res.status).toBe(307);
+    expect(res.headers.get('cache-control')).toMatch(/no-store/);
+  });
 });
 
 describe('matcher', () => {
@@ -176,6 +194,12 @@ describe('matcher', () => {
     ['/icon.svg', false],
     ['/apple-icon.png', false],
     ['/favicon.ico', false],
+    // Only the real icon files are skipped, not anything that looks like one
+    // (code review of #52): a protected route ending in .png, or a path that
+    // merely starts with "icon", must still pass through the proxy.
+    ['/iconography', true],
+    ['/reports/chart.png', true],
+    ['/icon.svg?abc123', false],
   ])('%s -> runs: %s', (url, runs) => {
     expect(unstable_doesMiddlewareMatch({ config, url })).toBe(runs);
   });

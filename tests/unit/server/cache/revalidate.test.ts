@@ -26,16 +26,33 @@ describe('tags', () => {
   });
 });
 
+/**
+ * The "Update profile" row of the matrix in
+ * docs/architecture/state-and-caching.md, written out — plus `profile`
+ * itself (M1-B07). Comparing against "every tag that exists" would be
+ * circular: it passes whatever the helper does (code review of #53).
+ */
+const PROFILE_CHANGE_ROW = [
+  'accounts',
+  'transactions',
+  'categories',
+  'budgets',
+  'goals',
+  'recurring',
+  'dashboard',
+  'sts',
+  'timeline',
+  'profile',
+] as const;
+
 describe('revalidateForProfileChange', () => {
-  it('invalidates every tag for that user — the matrix row is all ●, plus profile', () => {
+  it('invalidates exactly the documented row, for that user', () => {
     revalidateForProfileChange('u-1');
     const invalidated = updateTag.mock.calls
       .map(([tag]) => tag as string)
       .sort();
     expect(invalidated).toEqual(
-      Object.values(tags)
-        .map((make) => make('u-1'))
-        .sort(),
+      PROFILE_CHANGE_ROW.map((name) => tags[name]('u-1')).sort(),
     );
   });
 
