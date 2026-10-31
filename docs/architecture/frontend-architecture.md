@@ -305,6 +305,18 @@ Non-negotiable from M0, audited in `M9-F01`:
 | Landmarks | One `<main>`, one `<h1>`, meaningful heading order |
 | Automated check | `axe` clean in CI |
 
+### Menus and popovers (from M1-F04)
+
+Two Radix defaults fail axe; the account menu shows the fix for every later one:
+
+- **Non-modal** (`<DropdownMenu modal={false}>`). A modal menu marks the rest of
+  the page `aria-hidden`, which axe reports as `aria-hidden-focus` — and the page
+  appears to lose its `<main>` and `<h1>`. The WAI-ARIA menu button pattern does
+  not hide the page.
+- **Portal inside a landmark** (`DropdownMenuContent`'s `container` prop). The
+  default portals to the end of `<body>`, outside every landmark, which fails
+  axe's `region` rule.
+
 ### Charts need a text equivalent
 
 Every chart renders an **accessible fallback table** — visually hidden by

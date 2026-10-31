@@ -1,18 +1,43 @@
-// The authenticated app shell (M0-F02). A Server Component: the client
-// boundaries are only NavLink (active route), MobileNav (drawer state), and
-// ThemeToggle — see docs/architecture/frontend-architecture.md.
+// The authenticated app shell (M0-F02, M1-F04). A Server Component: the
+// client boundaries are only NavLink (active route), MobileNav (drawer
+// state), AccountMenu, and ThemeToggle — see
+// docs/architecture/frontend-architecture.md.
 //
-// Signed-out visitors never reach it: proxy.ts redirects them to /login
-// (M1-B06). The layout itself checks the session too from M1-F04.
+// proxy.ts already sends a signed-out visitor to /login. This layout checks
+// again, because a matcher change could silently skip the proxy, and a page
+// must never render for nobody.
 
+import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 
+import { AccountMenu } from '@/components/shell/account-menu';
 import { AddTransactionButton } from '@/components/shell/add-transaction-button';
 import { MobileNav } from '@/components/shell/mobile-nav';
 import { SidebarNav } from '@/components/shell/sidebar-nav';
 import { ThemeToggle } from '@/components/theme/theme-toggle';
+import { signOut } from '@/lib/server/actions/auth';
+import { displayNameOf, getProfile } from '@/lib/server/queries/profile';
 
-export default function AppLayout({ children }: { children: ReactNode }) {
+/** Form action for the menu's Log out. signOut redirects to /login. */
+async function signOutFromForm(): Promise<void> {
+  'use server';
+  await signOut();
+}
+
+export default async function AppLayout({ children }: { children: ReactNode }) {
+  const profile = await getProfile();
+  // No profile with a live session: sign that session out, rather than
+  // redirect to /login, which the proxy would bounce straight back here.
+  if (!profile) redirect('/auth/signout');
+
+  const account = (
+    <AccountMenu
+      name={displayNameOf(profile)}
+      email={profile.email}
+      signOutAction={signOutFromForm}
+    />
+  );
+
   return (
     <div className="flex min-h-dvh">
       {/* Desktop: persistent sidebar from 768px up. */}
@@ -22,7 +47,8 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         </span>
         <AddTransactionButton />
         <SidebarNav />
-        <div className="mt-auto">
+        <div className="mt-auto flex flex-col gap-2">
+          {account}
           <ThemeToggle />
         </div>
       </aside>
@@ -32,7 +58,10 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             thumb reach. */}
         <header className="flex items-center gap-2 border-b p-2 md:hidden">
           <MobileNav>
-            <SidebarNav />
+            <div className="flex h-full flex-col gap-4">
+              <SidebarNav />
+              <div className="mt-auto">{account}</div>
+            </div>
           </MobileNav>
           <span className="flex-1 truncate font-semibold">
             Where&apos;d My Money Go
