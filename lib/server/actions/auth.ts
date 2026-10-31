@@ -16,6 +16,7 @@
 
 import { redirect } from 'next/navigation';
 
+import { isRecentRecovery } from '@/lib/server/auth/recovery';
 import { logger, newRequestId } from '@/lib/server/logger';
 import {
   fail,
@@ -166,7 +167,9 @@ export async function requestPasswordReset(
   const supabase = await createServerSupabaseClient();
   const { error } = await supabase.auth.resetPasswordForEmail(
     parsed.data.email,
-    { redirectTo: `${siteUrl()}/auth/callback?next=/reset-password/update` },
+    // The recovery email template appends &token_hash=…&type=recovery to
+    // this (supabase/templates/recovery.html); /auth/confirm verifies it.
+    { redirectTo: `${siteUrl()}/auth/confirm?next=/reset-password/update` },
   );
   if (error) {
     // A rate limit is per-IP, not per-account, so reporting it leaks nothing.
@@ -182,37 +185,6 @@ export async function requestPasswordReset(
     });
   }
   return ok(null);
-}
-
-/** How recent a recovery-link sign-in must be to change the password. */
-const RECOVERY_WINDOW_SECONDS = 3600;
-
-/**
- * Methods a password-recovery link signs in with, observed against the local
- * stack. The emailed link (PKCE: verify, then /auth/callback exchanges the
- * code) yields `recovery`; verifying the link's token hash directly yields
- * `otp`. A password login yields `password`, which is refused. The MVP has no
- * other OTP sign-in, so `otp` also means "came from the link".
- *
- * `recovery` was missing at first: the integration test used the token-hash
- * path, and only M1-F03's E2E through the real email showed that genuine
- * resets were being refused.
- */
-const RECOVERY_METHODS: ReadonlySet<string> = new Set(['recovery', 'otp']);
-
-/** True when the session came from a password-recovery link in the last hour. */
-function isRecentRecovery(
-  amr: readonly (string | { method: string; timestamp: number })[] | undefined,
-): boolean {
-  const now = Math.floor(Date.now() / 1000);
-  return (amr ?? []).some(
-    (entry) =>
-      // A bare string (RFC 8176 form) has no timestamp, so its age cannot be
-      // checked: not accepted.
-      typeof entry !== 'string' &&
-      RECOVERY_METHODS.has(entry.method) &&
-      now - entry.timestamp <= RECOVERY_WINDOW_SECONDS,
-  );
 }
 
 /**

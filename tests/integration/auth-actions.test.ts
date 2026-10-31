@@ -1,3 +1,5 @@
+import './next-runtime';
+
 import { randomUUID } from 'node:crypto';
 
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -313,12 +315,12 @@ describe('updatePassword', () => {
     expect(await sessionUserId()).toBe(user.id);
   });
 
-  it('accepts the session the emailed link creates (PKCE code exchange)', async () => {
-    // The path a real user takes: the action stores the PKCE verifier in the
-    // cookie jar, the email's link verifies and redirects with a code, and
-    // /auth/callback exchanges it. That session's amr method is `recovery`,
-    // not the `otp` the token-hash path above yields — missing it refused
-    // every genuine reset until M1-F03's E2E caught it.
+  it('follows the emailed link on a different device and changes the password', async () => {
+    // The path a real user takes, from another device: the email's link
+    // carries a token hash (supabase/templates/recovery.html) that
+    // /auth/confirm verifies, so nothing from the requesting browser is
+    // needed. The old PKCE link failed on any other device (code review of
+    // #55); the cleared cookie jar below is that other device.
     const user = await createUser({ confirmed: true });
     await actions.requestPasswordReset({ email: user.email });
 
@@ -335,20 +337,23 @@ describe('updatePassword', () => {
         const message = await fetch(
           `http://127.0.0.1:54324/api/v1/message/${id}`,
         );
-        const { Text } = (await message.json()) as { Text: string };
-        link = /https?:\/\/\S+\/auth\/v1\/verify\?\S+/.exec(Text)?.[0];
+        const { HTML } = (await message.json()) as { HTML: string };
+        link = /href="([^"]*\/auth\/confirm[^"]*)"/
+          .exec(HTML)?.[1]
+          ?.replaceAll('&amp;', '&');
       }
       if (!link) await new Promise((resolve) => setTimeout(resolve, 250));
     }
     if (!link) throw new Error('no reset email');
+    expect(new URL(link).searchParams.get('type')).toBe('recovery');
 
-    const verified = await fetch(link, { redirect: 'manual' });
-    const code = new URL(
-      verified.headers.get('location') ?? '',
-    ).searchParams.get('code');
-    const client = await createServerSupabaseClient();
-    const exchanged = await client.auth.exchangeCodeForSession(code ?? '');
-    expect(exchanged.error).toBeNull();
+    jar.clear(); // another device: no cookies from the request
+    const { GET } = await import('@/app/auth/confirm/route');
+    const { NextRequest } = await import('next/server');
+    const confirmed = await GET(new NextRequest(link));
+    expect(new URL(confirmed.headers.get('location') ?? '').pathname).toBe(
+      '/reset-password/update',
+    );
 
     const to = await redirectOf(() =>
       actions.updatePassword({
@@ -357,6 +362,29 @@ describe('updatePassword', () => {
       }),
     );
     expect(to).toBe('/dashboard');
+  });
+
+  it('refuses the same emailed link a second time', async () => {
+    const user = await createUser({ confirmed: true });
+    const link = await admin.auth.admin.generateLink({
+      type: 'recovery',
+      email: user.email,
+    });
+    if (link.error) throw link.error;
+    const url = `http://localhost:3000/auth/confirm?next=/reset-password/update&token_hash=${link.data.properties.hashed_token}&type=recovery`;
+    const { GET } = await import('@/app/auth/confirm/route');
+    const { NextRequest } = await import('next/server');
+
+    const first = await GET(new NextRequest(url));
+    expect(new URL(first.headers.get('location') ?? '').pathname).toBe(
+      '/reset-password/update',
+    );
+    jar.clear();
+    const second = await GET(new NextRequest(url));
+    const location = new URL(second.headers.get('location') ?? '');
+    expect(`${location.pathname}${location.search}`).toBe(
+      '/reset-password?link=expired',
+    );
   });
 
   it('reports a mismatched confirmation on the confirmation field', async () => {
