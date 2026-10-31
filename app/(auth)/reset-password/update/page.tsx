@@ -3,7 +3,7 @@ import Link from 'next/link';
 
 import type { FormState } from '@/components/auth/form-parts';
 import { NewPasswordForm } from '@/components/auth/new-password-form';
-import { updatePassword } from '@/lib/server/actions/auth';
+import { signOut, updatePassword } from '@/lib/server/actions/auth';
 import { isRecentRecovery } from '@/lib/server/auth/recovery';
 import { createServerSupabaseClient } from '@/lib/server/supabase/server';
 import { pickFields } from '@/lib/utils/form-data';
@@ -31,6 +31,12 @@ async function updatePasswordFromForm(
   return toFormState(result);
 }
 
+/** "Not you?" — leave the session this link created. */
+async function signOutFromForm(): Promise<void> {
+  'use server';
+  await signOut();
+}
+
 export default async function UpdatePasswordPage() {
   const supabase = await createServerSupabaseClient();
   const { data } = await supabase.auth.getClaims();
@@ -38,6 +44,10 @@ export default async function UpdatePasswordPage() {
   // older than an hour, would only get a form that always fails (code review
   // of #55).
   const fromRecoveryLink = isRecentRecovery(data?.claims.amr);
+  // The account this link actually signed into, from the verified session —
+  // never from the link, which an attacker controls (security review of #55).
+  const account =
+    typeof data?.claims.email === 'string' ? data.claims.email : null;
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center gap-6 p-6">
@@ -48,7 +58,26 @@ export default async function UpdatePasswordPage() {
         </p>
       </div>
       {fromRecoveryLink ? (
-        <NewPasswordForm action={updatePasswordFromForm} />
+        <div className="flex flex-col gap-4">
+          {/* Shown before anything changes: if someone sent you their own
+              reset link, this is where you notice it is not your account. */}
+          {account ? (
+            <div className="flex flex-col gap-2 rounded-md border border-border bg-muted px-3 py-3 text-sm">
+              <p>
+                Choosing a new password for <strong>{account}</strong>.
+              </p>
+              <form action={signOutFromForm}>
+                <button
+                  type="submit"
+                  className="font-medium underline underline-offset-4"
+                >
+                  Not your account? Sign out
+                </button>
+              </form>
+            </div>
+          ) : null}
+          <NewPasswordForm action={updatePasswordFromForm} />
+        </div>
       ) : (
         <div className="flex flex-col gap-3">
           <p
