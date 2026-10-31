@@ -107,6 +107,14 @@ test('resets the password through the emailed link, then logs in with it', async
 
   await openResetLink(page, await resetLinkFor(user.email));
   await expect(page).toHaveURL(/\/reset-password\/update$/, AFTER_SUBMIT);
+  // The verified account is named before anything changes (security review
+  // of #55): a victim sent someone else's link notices here.
+  await expect(
+    page.getByText(`Choosing a new password for ${user.email}.`),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Not your account? Sign out' }),
+  ).toBeVisible();
 
   await page.getByLabel('New password').fill('brand-new-pass-1');
   await page.getByLabel('Type it again').fill('brand-new-pass-1');
