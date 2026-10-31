@@ -34,6 +34,8 @@ jobs:
             **/*.md
             !node_modules
 
+      # supabase/templates holds Auth email templates: their hrefs are Go
+      # template placeholders ({{ .RedirectTo }}…), not links in this repo.
       # --offline checks relative links only. External links are deliberately
       # not checked: a third-party site going down should never turn this repo
       # red. Enable network checks later on the scheduled run only.
@@ -45,6 +47,7 @@ jobs:
             --no-progress
             --include-fragments
             --exclude-path node_modules
+            --exclude-path supabase/templates
             .
           fail: true
 

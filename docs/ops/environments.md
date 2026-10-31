@@ -168,6 +168,12 @@ Ordered, because the ordering matters:
    Real email for everyone needs a verified domain on a provider such as
    Resend — Resend's `onboarding@resend.dev` test sender has the same
    own-address-only limit. Production decides separately, at M9-B06.
+   **The recovery email template** (`supabase/templates/recovery.html`) sends
+   a token-hash link that works on any device. Supabase refuses template
+   changes on free-tier projects using the built-in mailer (`400: Email
+   template modification is not available…`, 2026-10-31), so the preview
+   still sends the default link — a PKCE code that works only in the browser
+   that asked. `/auth/confirm` accepts both. Custom SMTP lifts the limit.
 6. Deploy the app.
 7. Smoke test: sign up → add an account → add a transaction → check the
    dashboard → verify Safe to Spend computes.
