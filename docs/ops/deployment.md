@@ -140,8 +140,9 @@ credentials, and **no scope holds the `service_role` key**:
 | Password protection | Off | A paid add-on; the team is on the Hobby plan, and Vercel Authentication already covers it. |
 
 While production has no custom domain, the production URL is also behind
-Vercel Authentication — correct while there is no production backend. M9-B06
-adds the custom domain, which is the publicly reachable entry point.
+Vercel Authentication. Production has its own Supabase project since
+2026-10-31 ([environments.md](environments.md#supabase-projects)); M9-B06 adds
+the custom domain, which is the publicly reachable entry point.
 
 ### Promotion path
 
@@ -210,6 +211,12 @@ only for migrations. See
 12. Tag v1.0.0 with a changelog.
 13. Update this doc and environments.md with the actual values.
 ```
+
+Steps 1–4, 6 and 7 were done early, on 2026-10-31, after production answered
+500 on every page with no backend behind it
+([environments.md](environments.md#supabase-projects)). Step 6's email
+templates are not set: the free tier's built-in mailer does not allow them.
+M9-B06 re-runs step 4 against the schema as it stands at launch.
 
 Step 4 is manual despite CI checking it on every change. A freshly provisioned
 project has never been through that gate, and a missing policy here means every
