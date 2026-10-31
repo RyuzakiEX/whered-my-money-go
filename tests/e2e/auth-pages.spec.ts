@@ -113,6 +113,18 @@ test.describe('log in (M1-F02)', () => {
     await expect(page).toHaveURL(/\/login$/);
   });
 
+  test('keeps what the user typed after a failed attempt', async ({ page }) => {
+    // React 19 resets an uncontrolled <form action> after every action, even
+    // one that returned an error: a mistyped password wiped the email too
+    // (code review of #54).
+    await page.goto('/login');
+    await page.getByLabel('Email').fill('keep-me@example.test');
+    await page.getByLabel('Password').fill('wrong-pass-1');
+    await page.getByRole('button', { name: 'Log in' }).click();
+    await expect(formAlert(page)).toBeVisible(AFTER_SUBMIT);
+    await expect(page.getByLabel('Email')).toHaveValue('keep-me@example.test');
+  });
+
   test('says exactly the same for an email with no account', async ({
     page,
   }) => {

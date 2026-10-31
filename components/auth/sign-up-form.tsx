@@ -8,6 +8,8 @@ import {
   ErrorSummary,
   SubmitButton,
   TextField,
+  useFieldValues,
+  useResultKey,
   type FormAction,
   type FormState,
 } from './form-parts';
@@ -19,6 +21,8 @@ export function SignUpForm({ action }: { action: FormAction }) {
     action,
     {},
   );
+  const bind = useFieldValues(['email', 'password', 'displayName']);
+  const resultKey = useResultKey(state);
   const { onBlur, onSubmit, errorsFor } = useFieldValidation(
     signUpSchema,
     state.fields,
@@ -32,9 +36,10 @@ export function SignUpForm({ action }: { action: FormAction }) {
       noValidate
       className="flex flex-col gap-5"
     >
-      <ErrorSummary message={state.message} />
+      <ErrorSummary key={resultKey} message={state.message} />
       <TextField
         name="email"
+        {...bind('email')}
         label="Email"
         type="email"
         autoComplete="email"
@@ -43,6 +48,7 @@ export function SignUpForm({ action }: { action: FormAction }) {
       />
       <TextField
         name="password"
+        {...bind('password')}
         label="Password"
         type="password"
         autoComplete="new-password"
@@ -52,6 +58,7 @@ export function SignUpForm({ action }: { action: FormAction }) {
       />
       <TextField
         name="displayName"
+        {...bind('displayName')}
         label="What should we call you? (optional)"
         autoComplete="nickname"
         errors={errorsFor('displayName')}
