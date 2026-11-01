@@ -31,11 +31,11 @@ runs.**
 
 ### 1. How much money do I have?
 
-- [ ] Accounts page lists every non-archived account with its current balance
-- [ ] A total across spendable accounts is shown
-- [ ] Balances are **derived** from transactions, not a stored column
-- [ ] Credit-card balances display as negative (owed), never as available credit
-- [ ] Excluded accounts are visibly distinguished from spendable ones
+- [x] Accounts page lists every non-archived account with its current balance — *M2-F01*
+- [x] A total across spendable accounts is shown — *M2-F01; `accounts.spec.ts`*
+- [ ] Balances are **derived** from transactions, not a stored column — *M2 derives it in the query from the opening balance, as no transaction can exist yet; the `account_balances` view lands in M3 with M2-B02*
+- [ ] Credit-card balances display as negative (owed), never as available credit — *M2-F01 shows a negative balance as negative (minus sign, destructive colour) and adds it to the total as a negative; what makes a card's balance negative is charges against it, which arrive with M3*
+- [x] Excluded accounts are visibly distinguished from spendable ones — *M2-F01: a "Not counted in Safe to Spend" badge*
 - [ ] Dashboard balance tile agrees with the accounts page total
 
 **Reachable in:** one click from the dashboard.
