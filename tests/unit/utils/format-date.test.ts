@@ -23,6 +23,16 @@ describe('formatInstantAsDate', () => {
     ).toBe('Nov 1, 2026');
   });
 
+  it('completes a bare-hour offset after a time, and leaves a date alone', () => {
+    expect(formatInstantAsDate('2026-11-01T01:00:00+08', 'Asia/Manila')).toBe(
+      'Nov 1, 2026',
+    );
+    // A date-only string ends in digits too; it must not become `…-01:00`.
+    expect(formatInstantAsDate('2026-11-01', 'Asia/Manila')).toBe(
+      'Nov 1, 2026',
+    );
+  });
+
   it('throws on an unreadable instant rather than print "Invalid Date"', () => {
     expect(() => formatInstantAsDate('yesterday', 'Asia/Manila')).toThrow(
       RangeError,

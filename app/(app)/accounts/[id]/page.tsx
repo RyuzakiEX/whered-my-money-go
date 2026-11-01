@@ -22,7 +22,7 @@ import { getProfile } from '@/lib/server/queries/profile';
 import { formatInstantAsDate } from '@/lib/utils/format-date';
 import { formatMoney } from '@/lib/utils/format-money';
 
-import { archive, remove, restore, update } from '../actions';
+import { archive, removeAndLeave, restore, update } from '../actions';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -55,28 +55,6 @@ export default async function AccountPage({ params }: Props) {
         </Link>
       </nav>
 
-      {archived ? (
-        <section
-          aria-labelledby="archived-heading"
-          className="flex flex-col gap-3 rounded-xl border border-dashed bg-muted/40 p-4 sm:flex-row sm:items-center"
-        >
-          <ArchiveIcon aria-hidden className="size-5 shrink-0" />
-          <div className="flex flex-1 flex-col gap-1">
-            <h2 id="archived-heading" className="text-sm font-medium">
-              This account is archived
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              It stays out of your totals, pickers, and Safe to Spend, and
-              it&apos;s read-only. Restore it to make changes.
-            </p>
-          </div>
-          <RestoreAccountButton
-            accountName={account.name}
-            restoreAction={restore.bind(null, account.id)}
-          />
-        </section>
-      ) : null}
-
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <span className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-muted">
@@ -101,9 +79,31 @@ export default async function AccountPage({ params }: Props) {
           updateAction={update.bind(null, account.id)}
           archiveAction={archive.bind(null, account.id)}
           restoreAction={restore.bind(null, account.id)}
-          deleteAction={remove.bind(null, account.id)}
+          deleteAction={removeAndLeave.bind(null, account.id)}
         />
       </div>
+
+      {archived ? (
+        <section
+          aria-labelledby="archived-heading"
+          className="flex flex-col gap-3 rounded-xl border border-dashed bg-muted/40 p-4 sm:flex-row sm:items-center"
+        >
+          <ArchiveIcon aria-hidden className="size-5 shrink-0" />
+          <div className="flex flex-1 flex-col gap-1">
+            <h2 id="archived-heading" className="text-sm font-medium">
+              This account is archived
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              It stays out of your totals, pickers, and Safe to Spend, and
+              it&apos;s read-only. Restore it to make changes.
+            </p>
+          </div>
+          <RestoreAccountButton
+            accountName={account.name}
+            restoreAction={restore.bind(null, account.id)}
+          />
+        </section>
+      ) : null}
 
       <section
         aria-labelledby="balance-heading"

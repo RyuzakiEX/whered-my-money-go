@@ -30,7 +30,11 @@ export function formatInstantAsDate(
   timeZone: string,
   locale = 'en-PH',
 ): string {
-  const iso = instant.replace(' ', 'T').replace(/([+-]\d{2})$/, '$1:00');
+  // Only a time's bare-hour offset (`…05.123+00`) gains its `:00`; a date
+  // such as `2026-11-01` ends in digits too and must not.
+  const iso = instant
+    .replace(' ', 'T')
+    .replace(/(T[\d:.]+[+-]\d{2})$/, '$1:00');
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) {
     throw new RangeError(`not an instant: ${instant}`);

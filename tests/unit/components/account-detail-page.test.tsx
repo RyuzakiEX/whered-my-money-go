@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import {
+  act,
   cleanup,
   render,
   screen,
@@ -151,6 +152,18 @@ describe('account page (M2-F04)', () => {
       });
     });
 
+    it('keeps the h1 first: the banner comes after the title', async () => {
+      await renderPage();
+      const headings = screen.getAllByRole('heading');
+      expect(headings[0]?.tagName).toBe('H1');
+      expect(headings.map((h) => h.textContent)).toEqual([
+        'GCash',
+        'This account is archived',
+        'Current balance',
+        'Transactions',
+      ]);
+    });
+
     it('shows the archived banner with a restore action', async () => {
       await renderPage();
       const banner = screen
@@ -216,24 +229,36 @@ describe('AccountDetailActions', () => {
     );
   });
 
-  it('leaves the page after a delete', async () => {
+  it('cannot be reopened while an archive is in flight', async () => {
+    let settle: (r: { ok: true }) => void = () => undefined;
     render(
       <AccountDetailActions
         account={gcash}
         updateAction={ok}
-        archiveAction={ok}
+        archiveAction={() =>
+          new Promise((resolve) => {
+            settle = resolve;
+          })
+        }
         restoreAction={ok}
         deleteAction={ok}
       />,
     );
-    screen.getByRole('button', { name: 'Actions for GCash' }).focus();
+    const trigger = screen.getByRole<HTMLButtonElement>('button', {
+      name: 'Actions for GCash',
+    });
+    trigger.focus();
     await userEvent.keyboard('{Enter}');
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Delete' }));
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Delete account' }),
-    );
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Archive' }));
     await waitFor(() => {
-      expect(router.replace).toHaveBeenCalledWith('/accounts');
+      expect(trigger.disabled).toBe(true);
+    });
+    await act(async () => {
+      settle({ ok: true });
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(trigger.disabled).toBe(false);
     });
   });
 

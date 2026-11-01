@@ -5,13 +5,10 @@
 //
 // An archived account is read-only until restored — updateAccount refuses to
 // change one — so its Edit stays visible but disabled, with the reason
-// attached, and its menu offers only Delete. Deleting leaves the page: the
-// account it describes is gone.
+// attached, and its menu offers only Delete. Deleting leaves the page — the
+// account it describes is gone — by a redirect from the server.
 
 import { PencilIcon } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { useTransition } from 'react';
-import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import type { Account } from '@/lib/core/types';
@@ -20,7 +17,8 @@ import { formatMinorForInput } from '@/lib/utils/format-money';
 import { AccountActionsMenu } from './account-actions-menu';
 import { AccountDialog } from './account-dialog';
 import type { AccountFormValues, AccountSaveResult } from './account-form';
-import { settle, type AccountActionResult } from './action-result';
+import type { AccountActionResult } from './action-result';
+import { useArchiveWithUndo } from './use-archive-with-undo';
 
 export const EDIT_DISABLED_REASON = 'Restore this account to edit it.';
 
@@ -38,34 +36,8 @@ export function AccountDetailActions({
   restoreAction: () => Promise<AccountActionResult>;
   deleteAction: () => Promise<AccountActionResult>;
 }) {
-  const router = useRouter();
-  const [, startTransition] = useTransition();
+  const { archive, pending } = useArchiveWithUndo();
   const archived = account.archivedAt !== null;
-
-  function report(result: AccountActionResult, success: () => void) {
-    if (result.ok) success();
-    else toast.error(result.message);
-    if (!result.ok && result.unconfirmed) router.refresh();
-  }
-
-  function archive() {
-    startTransition(async () => {
-      report(await settle(archiveAction), () =>
-        toast.success(`${account.name} archived. It's resting, not gone.`, {
-          action: {
-            label: 'Undo',
-            onClick: () => {
-              startTransition(async () => {
-                report(await settle(restoreAction), () =>
-                  toast.success(`${account.name} is back.`),
-                );
-              });
-            },
-          },
-        }),
-      );
-    });
-  }
 
   return (
     <div className="flex items-center gap-2">
@@ -78,7 +50,9 @@ export function AccountDetailActions({
           <Button
             variant="outline"
             size="lg"
-            className="min-h-11"
+            // Looks disabled too: the Button's styles key off `:disabled`,
+            // which aria-disabled does not set.
+            className="min-h-11 cursor-not-allowed opacity-50 hover:bg-transparent active:translate-y-0"
             aria-disabled="true"
             aria-describedby="edit-disabled-reason"
           >
@@ -109,11 +83,16 @@ export function AccountDetailActions({
       )}
       <AccountActionsMenu
         accountName={account.name}
-        {...(archived ? {} : { onArchive: archive })}
+        {...(archived
+          ? {}
+          : {
+              onArchive: () => {
+                archive(account.name, archiveAction, restoreAction);
+              },
+            })}
+        // Redirects to the list on success (removeAndLeave), from the server.
         deleteAction={deleteAction}
-        onDeleted={() => {
-          router.replace('/accounts');
-        }}
+        busy={pending}
       />
     </div>
   );

@@ -11,6 +11,7 @@ import { redirect } from 'next/navigation';
 import { AccountActionsMenu } from '@/components/accounts/account-actions-menu';
 import { AccountCard } from '@/components/accounts/account-card';
 import { AccountDialog } from '@/components/accounts/account-dialog';
+import { DeletedNotice } from '@/components/accounts/deleted-notice';
 import { ActiveAccountList } from '@/components/accounts/active-account-list';
 import { RestoreAccountButton } from '@/components/accounts/restore-account-button';
 import { cn } from '@/components/ui/cn';
@@ -45,6 +46,8 @@ export default async function AccountsPage({
   // `?archived=1` shows archived accounts; anything else is the default view,
   // so a hand-edited URL falls back instead of erroring.
   const showArchived = search['archived'] === '1';
+  // Set by a delete on an account's own page, which redirects here.
+  const justDeleted = search['deleted'] === '1';
 
   const active = accounts.filter((account) => account.archivedAt === null);
   const archived = accounts.filter((account) => account.archivedAt !== null);
@@ -63,6 +66,7 @@ export default async function AccountsPage({
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+      {justDeleted ? <DeletedNotice /> : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         {/* Focusable from script: where focus lands after a delete removes
             the card it was on (AccountActionsMenu). */}
@@ -194,6 +198,8 @@ export default async function AccountsPage({
                           <RestoreAccountButton
                             accountName={account.name}
                             restoreAction={restore.bind(null, account.id)}
+                            // The restored card joins this list.
+                            focusAfter="active-heading"
                           />
                           <AccountActionsMenu
                             accountName={account.name}

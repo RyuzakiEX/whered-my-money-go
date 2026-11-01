@@ -17,9 +17,15 @@ import { settle, type AccountActionResult } from './action-result';
 export function RestoreAccountButton({
   accountName,
   restoreAction,
+  focusAfter,
 }: {
   accountName: string;
   restoreAction: () => Promise<AccountActionResult>;
+  /**
+   * Where focus goes after a restore, which always takes this button away.
+   * Falls back to the page heading when that element is not there (yet).
+   */
+  focusAfter?: string;
 }) {
   const [pending, startTransition] = useTransition();
   const router = useRouter();
@@ -30,10 +36,13 @@ export function RestoreAccountButton({
       if (result.ok) {
         toast.success(`${accountName} is back. Welcome home.`);
         // A restore always takes this button away — the card moves to the
-        // active list, the detail page's banner goes — so focus moves to
-        // the page heading rather than fall to <body>.
+        // active list, the detail page's banner goes — so focus moves on
+        // rather than fall to <body>.
         requestAnimationFrame(() => {
-          document.querySelector<HTMLElement>('main h1')?.focus();
+          const target =
+            (focusAfter ? document.getElementById(focusAfter) : null) ??
+            document.querySelector<HTMLElement>('main h1');
+          target?.focus();
         });
       } else {
         toast.error(result.message);
