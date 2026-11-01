@@ -51,21 +51,21 @@ export const INVALIDATES: Readonly<
   ],
 };
 
-export function revalidateForProfileChange(userId: string): void {
-  for (const name of INVALIDATES.profileChange) {
+function invalidate(row: keyof typeof INVALIDATES, userId: string): void {
+  for (const name of INVALIDATES[row]) {
     updateTag(tags[name](userId));
   }
 }
 
+export function revalidateForProfileChange(userId: string): void {
+  invalidate('profileChange', userId);
+}
+
 export function revalidateForAccountChange(userId: string): void {
-  for (const name of INVALIDATES.accountChange) {
-    updateTag(tags[name](userId));
-  }
+  invalidate('accountChange', userId);
 }
 
 /** Archive, restore, and delete: restoring undoes an archive, same row. */
 export function revalidateForAccountRemoval(userId: string): void {
-  for (const name of INVALIDATES.accountRemoval) {
-    updateTag(tags[name](userId));
-  }
+  invalidate('accountRemoval', userId);
 }

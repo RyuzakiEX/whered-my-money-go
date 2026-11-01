@@ -364,7 +364,8 @@ account exists ([security-model.md](../security/security-model.md#t7--account-en
 them, rather than shipped unused. **M2-B06** added `not_found` (with
 `EntityName = 'account'`). A duplicate account name is answered as a
 `validation` error on the `name` field, naming the existing account, because
-the form renders it inline; `conflict` is still unshipped.
+the form renders it inline. It also added `conflict`, with the one reason
+`account_archived`: an archived account is read-only until restored.
 
 Why a union rather than exceptions:
 

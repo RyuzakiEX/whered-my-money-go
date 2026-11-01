@@ -211,6 +211,17 @@ describe('createAccount', () => {
     });
   });
 
+  it("names the right account when the name holds PostgREST's * wildcard", async () => {
+    // Under PostgREST's ILIKE, `*` means `%`, so 'savings*' would also match
+    // the decoy, which is seeded first.
+    await seed(a.id, { name: 'SAVINGS fund' });
+    await seed(a.id, { name: 'Savings*' });
+    const result = await actions.createAccount({ ...input, name: 'savings*' });
+    expect(result).toMatchObject({
+      error: { fields: { name: [ACCOUNT_MESSAGES.nameTaken('Savings*')] } },
+    });
+  });
+
   it('answers unauthenticated when signed out, and writes nothing', async () => {
     jar.clear();
     expect(await actions.createAccount(input)).toEqual({
@@ -277,6 +288,28 @@ describe('updateAccount', () => {
       error: { fields: { name: [ACCOUNT_MESSAGES.nameTaken('Seabank')] } },
     });
     expect((await rowOf(id))?.name).toBe('Seabank 2');
+  });
+
+  it('refuses to edit an archived account until it is restored', async () => {
+    const id = await seed(a.id, {
+      name: 'Shelved',
+      archived_at: '2026-10-01T00:00:00+00:00',
+    });
+    const result = await actions.updateAccount({
+      ...input,
+      id,
+      name: 'Unshelved',
+    });
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        kind: 'conflict',
+        reason: 'account_archived',
+        message: ACCOUNT_MESSAGES.archived,
+      },
+    });
+    expect((await rowOf(id))?.name).toBe('Shelved');
+    expect(updateTag).not.toHaveBeenCalled();
   });
 
   it("answers not_found for another user's account, and leaves it untouched", async () => {

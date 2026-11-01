@@ -30,8 +30,8 @@ function query(): unknown {
     'update',
     'delete',
     'eq',
-    'ilike',
-    'limit',
+    'is',
+    'not',
   ]) {
     chain[method] = () => chain;
   }
@@ -110,18 +110,41 @@ describe('when Auth fails', () => {
       });
       expect(await run()).toEqual(UNEXPECTED);
       expect(logged()).toContain('account.auth_failed');
+      expect(logged()).toContain('unexpected_failure'); // Auth's code, kept
       expect(logged()).not.toContain('JWKS fetch failed');
       expect(updateTag).not.toHaveBeenCalled();
     },
   );
+
+  it("surfaces a failure that is not Auth's instead of reporting an outage", async () => {
+    getClaims.mockRejectedValue(new TypeError('a bug'));
+    await expect(actions.createAccount(input)).rejects.toThrow('a bug');
+  });
 });
 
-describe('when signed out', () => {
-  it.each(everyAction)('%s answers unauthenticated', async (_, run) => {
+describe('the documented order: session before input', () => {
+  it('answers a signed-out caller unauthenticated, whatever they sent', async () => {
     getClaims.mockResolvedValue({ data: null, error: null });
-    expect(await run()).toEqual({
+    for (const run of [
+      ...everyAction.map(([, action]) => action),
+      () => actions.updateAccount({ id: 'nope' }),
+      () => actions.archiveAccount(null),
+      () => actions.deleteAccount({ id: 1 }),
+    ]) {
+      expect(await run()).toEqual({
+        ok: false,
+        error: { kind: 'unauthenticated' },
+      });
+    }
+  });
+
+  it('then rejects a missing id as validation', async () => {
+    expect(await actions.updateAccount(input)).toMatchObject({
       ok: false,
-      error: { kind: 'unauthenticated' },
+      error: { kind: 'validation', fields: { id: expect.any(Array) } },
+    });
+    expect(await actions.updateAccount(null)).toMatchObject({
+      error: { kind: 'validation' },
     });
   });
 });
@@ -145,51 +168,71 @@ describe('when the database fails', () => {
     expect(logged()).not.toContain('canceling statement');
   });
 
-  it.each(everyAction.slice(1))(
-    '%s: the ownership re-check',
-    async (_, run) => {
-      results = [dbError];
-      expect(await run()).toEqual(UNEXPECTED);
-      expect(logged()).toContain('account.read_failed');
-    },
-  );
-
   it.each([
     ['updateAccount', () => actions.updateAccount({ ...input, id: ID })],
     ['archiveAccount', () => actions.archiveAccount({ id: ID })],
-    ['deleteAccount', () => actions.deleteAccount({ id: ID })],
-  ] as const)('%s: the write', async (_, run) => {
-    results = [owned, dbError];
+    ['restoreAccount', () => actions.restoreAccount({ id: ID })],
+  ] as const)('%s: the ownership re-check', async (_, run) => {
+    results = [dbError];
+    expect(await run()).toEqual(UNEXPECTED);
+    expect(logged()).toContain('account.read_failed');
+  });
+
+  it.each([
+    [
+      'updateAccount',
+      () => actions.updateAccount({ ...input, id: ID }),
+      [owned],
+    ],
+    ['archiveAccount', () => actions.archiveAccount({ id: ID }), [owned]],
+    // No pre-read: the user_id-scoped delete is the ownership check.
+    ['deleteAccount', () => actions.deleteAccount({ id: ID }), []],
+  ] as const)('%s: the write', async (_, run, before) => {
+    results = [...before, dbError];
     expect(await run()).toEqual(UNEXPECTED);
     expect(logged()).toContain('account.write_failed');
     expect(updateTag).not.toHaveBeenCalled();
   });
 });
 
-describe('when the account vanishes between the re-check and the write', () => {
+describe('when the account changes between the re-check and the write', () => {
+  const gone = { data: [], error: null };
+  const missing = { data: null, error: null };
+
   it.each([
-    ['updateAccount', () => actions.updateAccount({ ...input, id: ID })],
-    ['archiveAccount', () => actions.archiveAccount({ id: ID })],
-    ['deleteAccount', () => actions.deleteAccount({ id: ID })],
+    [
+      'updateAccount',
+      () => actions.updateAccount({ ...input, id: ID }),
+      [owned, gone],
+    ],
+    [
+      'archiveAccount',
+      () => actions.archiveAccount({ id: ID }),
+      [owned, gone, missing],
+    ],
+    ['deleteAccount', () => actions.deleteAccount({ id: ID }), [gone]],
   ] as const)(
-    '%s answers not_found and invalidates nothing',
-    async (_, run) => {
-      results = [owned, { data: [], error: null }];
+    '%s answers not_found when it was deleted',
+    async (_, run, script) => {
+      results = [...script];
       expect(await run()).toEqual(NOT_FOUND);
       expect(updateTag).not.toHaveBeenCalled();
     },
   );
-});
 
-describe('updateAccount input', () => {
-  it('rejects a missing id before touching Auth or the database', async () => {
-    expect(await actions.updateAccount(input)).toMatchObject({
-      ok: false,
-      error: { kind: 'validation', fields: { id: expect.any(Array) } },
+  it('archiveAccount answers ok, writing nothing, when another request archived it first', async () => {
+    results = [
+      owned,
+      gone,
+      {
+        data: { currency: 'PHP', archived_at: '2026-11-01T00:00:00Z' },
+        error: null,
+      },
+    ];
+    expect(await actions.archiveAccount({ id: ID })).toEqual({
+      ok: true,
+      data: { id: ID },
     });
-    expect(await actions.updateAccount(null)).toMatchObject({
-      error: { kind: 'validation' },
-    });
-    expect(getClaims).not.toHaveBeenCalled();
+    expect(updateTag).not.toHaveBeenCalled();
   });
 });

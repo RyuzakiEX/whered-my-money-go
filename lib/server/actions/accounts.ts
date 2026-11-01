@@ -4,18 +4,20 @@
 //
 // MAY BE IMPORTED BY: the account forms and menus (M2-F02, M2-F03, M2-F04).
 //
-// Every action takes the user from the SESSION and re-verifies that the
-// account is theirs before writing, even though RLS also enforces it: RLS
-// answers "may this user touch this row", not "what should they be told".
-// Another user's account answers `not_found`, exactly like an id that never
-// existed, so ids cannot be probed
-// (docs/architecture/api-and-data-access.md#ownership-re-checks).
+// Each action follows the documented order: the user from the SESSION, then
+// the input, then an ownership re-check, then the write
+// (docs/architecture/api-and-data-access.md#server-actions). The re-check runs
+// even though RLS also enforces ownership: RLS answers "may this user touch
+// this row", not "what should they be told". Another user's account answers
+// `not_found`, exactly like an id that never existed, so ids cannot be probed.
+// Every write is also scoped by user_id, so a missing policy is never the
+// only thing between one user and another's account.
 //
 // Writes name every column. Client input is never spread into a row.
 
 import type { SupportedCurrency } from '@/lib/core/money/currency';
 import { isSupportedCurrency } from '@/lib/core/money/currency';
-import { sessionUserId } from '@/lib/server/auth/session';
+import { SessionError, sessionUserId } from '@/lib/server/auth/session';
 import {
   revalidateForAccountChange,
   revalidateForAccountRemoval,
@@ -48,7 +50,17 @@ export interface AccountRef {
   id: string;
 }
 
+/** A step either produces its value or the envelope to return instead. */
+type Step<T> = { value: T } | { failure: ActionResult<never> };
+
 const NOT_FOUND = fail({ kind: 'not_found', entity: 'account' });
+
+/** The request-scoped context every action starts from. */
+interface Context {
+  supabase: ServerClient;
+  requestId: string;
+  action: AccountAction;
+}
 
 /**
  * Logs an infrastructure failure and answers with a correlation id only.
@@ -56,8 +68,7 @@ const NOT_FOUND = fail({ kind: 'not_found', entity: 'account' });
  * id (docs/architecture/observability.md).
  */
 function unexpected(
-  requestId: string,
-  action: AccountAction,
+  { requestId, action }: Context,
   event: string,
   errorCode: string,
   userId?: string,
@@ -72,67 +83,69 @@ function unexpected(
   return fail({ kind: 'unexpected', correlationId: requestId });
 }
 
-/** The session's user, or the envelope to return instead. */
-async function requireUser(
-  supabase: ServerClient,
-  requestId: string,
+/** Step 1: the session's user. */
+async function start(
   action: AccountAction,
-): Promise<{ userId: string } | { failure: ActionResult<never> }> {
+): Promise<Step<Context & { userId: string }>> {
+  const ctx: Context = {
+    supabase: await createServerSupabaseClient(),
+    requestId: newRequestId(),
+    action,
+  };
   let userId: string | null;
   try {
-    userId = await sessionUserId(supabase);
-  } catch {
+    userId = await sessionUserId(ctx.supabase);
+  } catch (error) {
     // Auth itself failed. Not "signed out": that would send the user to log
-    // in again for nothing.
-    return {
-      failure: unexpected(requestId, action, 'account.auth_failed', 'auth'),
-    };
+    // in again for nothing. Anything else is our bug, and should surface.
+    if (!(error instanceof SessionError)) throw error;
+    return { failure: unexpected(ctx, 'account.auth_failed', error.code) };
   }
-  return userId ? { userId } : { failure: fail({ kind: 'unauthenticated' }) };
+  if (!userId) return { failure: fail({ kind: 'unauthenticated' }) };
+  return { value: { ...ctx, userId } };
 }
 
 /**
- * The ownership re-check: the account as this user can see it, or null.
- * Scoped by user_id as well as by RLS, so a missed policy is not the only
- * thing between a user and another's account.
+ * The ownership re-check: the account as this user can see it. A missing
+ * account and another user's answer the same `not_found`.
  */
 async function ownedAccount(
-  supabase: ServerClient,
-  userId: string,
+  ctx: Context & { userId: string },
   id: string,
-) {
-  return supabase
+): Promise<Step<{ currency: string; archived_at: string | null }>> {
+  const { data, error } = await ctx.supabase
     .from('accounts')
-    .select('id, currency, archived_at')
+    .select('currency, archived_at')
     .eq('id', id)
-    .eq('user_id', userId)
+    .eq('user_id', ctx.userId)
     .maybeSingle();
-}
-
-/** `\`, `%`, and `_` are wildcards in ILIKE; an account name is literal. */
-function likeLiteral(text: string): string {
-  return text.replace(/[\\%_]/g, (c) => `\\${c}`);
+  if (error) {
+    return {
+      failure: unexpected(ctx, 'account.read_failed', error.code, ctx.userId),
+    };
+  }
+  return data ? { value: data } : { failure: NOT_FOUND };
 }
 
 /**
- * The field error for a name that collides, case-insensitively, with another
- * of the user's accounts. Names the existing account as the user wrote it.
+ * The field error for a name that collides, ignoring case, with another of
+ * the user's accounts — naming the existing account as the user wrote it.
+ * Compared here rather than with ILIKE, where `%`, `_`, and (in PostgREST)
+ * `*` are wildcards that could name the wrong account.
  */
 async function nameTaken(
-  supabase: ServerClient,
-  userId: string,
+  ctx: Context & { userId: string },
   name: string,
 ): Promise<ActionResult<never>> {
-  const { data } = await supabase
+  const { data } = await ctx.supabase
     .from('accounts')
     .select('name')
-    .eq('user_id', userId)
-    .ilike('name', likeLiteral(name))
-    .limit(1)
-    .maybeSingle();
+    .eq('user_id', ctx.userId);
+  const wanted = name.toLowerCase();
+  const existing = data?.find((row) => row.name.toLowerCase() === wanted);
   return fail({
     kind: 'validation',
-    fields: { name: [ACCOUNT_MESSAGES.nameTaken(data?.name ?? name)] },
+    fields: { name: [ACCOUNT_MESSAGES.nameTaken(existing?.name ?? name)] },
   });
 }
 
@@ -142,12 +155,10 @@ const isUniqueName = (error: { code: string; message: string }) =>
 export async function createAccount(
   input: unknown,
 ): Promise<ActionResult<AccountRef>> {
-  const requestId = newRequestId();
-  const action = 'createAccount';
-  const supabase = await createServerSupabaseClient();
-  const session = await requireUser(supabase, requestId, action);
-  if ('failure' in session) return session.failure;
-  const { userId } = session;
+  const started = await start('createAccount');
+  if ('failure' in started) return started.failure;
+  const ctx = started.value;
+  const { supabase, userId } = ctx;
 
   // The account's currency is the profile's, chosen here and never taken
   // from the client — so the balance is parsed in that currency too.
@@ -158,8 +169,7 @@ export async function createAccount(
     .maybeSingle();
   if (profileError || !profile || !isSupportedCurrency(profile.currency)) {
     return unexpected(
-      requestId,
-      action,
+      ctx,
       'account.profile_unreadable',
       profileError?.code ?? 'no_profile',
       userId,
@@ -185,21 +195,15 @@ export async function createAccount(
     .select('id')
     .single();
   if (error) {
-    if (isUniqueName(error)) return nameTaken(supabase, userId, name);
-    return unexpected(
-      requestId,
-      action,
-      'account.write_failed',
-      error.code,
-      userId,
-    );
+    if (isUniqueName(error)) return nameTaken(ctx, name);
+    return unexpected(ctx, 'account.write_failed', error.code, userId);
   }
 
   revalidateForAccountChange(userId);
   logger.info('account.created', {
-    requestId,
+    requestId: ctx.requestId,
     userId,
-    action,
+    action: ctx.action,
     outcome: 'success',
   });
   return ok({ id: data.id });
@@ -208,8 +212,10 @@ export async function createAccount(
 export async function updateAccount(
   input: unknown,
 ): Promise<ActionResult<AccountRef>> {
-  const requestId = newRequestId();
-  const action = 'updateAccount';
+  const started = await start('updateAccount');
+  if ('failure' in started) return started.failure;
+  const ctx = started.value;
+  const { supabase, userId } = ctx;
 
   // The id first: the rest is parsed in the account's own currency, which may
   // differ from the profile's if that changed after the account was added.
@@ -218,26 +224,19 @@ export async function updateAccount(
   });
   if (!target.success) return validationError(target.error);
 
-  const supabase = await createServerSupabaseClient();
-  const session = await requireUser(supabase, requestId, action);
-  if ('failure' in session) return session.failure;
-  const { userId } = session;
-
-  const { data: account, error: readError } = await ownedAccount(
-    supabase,
-    userId,
-    target.data.id,
-  );
-  if (readError) {
-    return unexpected(
-      requestId,
-      action,
-      'account.read_failed',
-      readError.code,
-      userId,
-    );
+  const owned = await ownedAccount(ctx, target.data.id);
+  if ('failure' in owned) return owned.failure;
+  const account = owned.value;
+  if (!isSupportedCurrency(account.currency)) return NOT_FOUND;
+  // Archived accounts are read-only until restored; the detail page disables
+  // editing (M2-F04), and this holds when a stale tab does not.
+  if (account.archived_at !== null) {
+    return fail({
+      kind: 'conflict',
+      reason: 'account_archived',
+      message: ACCOUNT_MESSAGES.archived,
+    });
   }
-  if (!account || !isSupportedCurrency(account.currency)) return NOT_FOUND;
 
   const parsed = accountUpdateSchema(account.currency).safeParse(input);
   if (!parsed.success) return validationError(parsed.error);
@@ -254,88 +253,72 @@ export async function updateAccount(
     })
     .eq('id', id)
     .eq('user_id', userId)
+    // Archived between the re-check and here: refuse, as above.
+    .is('archived_at', null)
     .select('id');
   if (error) {
-    if (isUniqueName(error)) return nameTaken(supabase, userId, name);
-    return unexpected(
-      requestId,
-      action,
-      'account.write_failed',
-      error.code,
-      userId,
-    );
+    if (isUniqueName(error)) return nameTaken(ctx, name);
+    return unexpected(ctx, 'account.write_failed', error.code, userId);
   }
-  // Deleted between the re-check and the write.
+  // Deleted or archived between the re-check and the write.
   if (data.length !== 1) return NOT_FOUND;
 
   revalidateForAccountChange(userId);
   logger.info('account.updated', {
-    requestId,
+    requestId: ctx.requestId,
     userId,
-    action,
+    action: ctx.action,
     outcome: 'success',
   });
   return ok({ id });
 }
 
 /**
- * Sets or clears archived_at. Idempotent both ways: archiving an archived
- * account keeps its original archive time.
+ * Sets or clears archived_at. Idempotent both ways, and safe against a
+ * concurrent request: the write applies only while the account is still in
+ * the other state, so a double-click never moves the original archive time.
  */
 async function setArchived(
   input: unknown,
   archived: boolean,
 ): Promise<ActionResult<AccountRef>> {
-  const requestId = newRequestId();
-  const action = archived ? 'archiveAccount' : 'restoreAccount';
+  const started = await start(archived ? 'archiveAccount' : 'restoreAccount');
+  if ('failure' in started) return started.failure;
+  const ctx = started.value;
+  const { supabase, userId } = ctx;
+
   const parsed = accountIdSchema.safeParse(input);
   if (!parsed.success) return validationError(parsed.error);
   const { id } = parsed.data;
 
-  const supabase = await createServerSupabaseClient();
-  const session = await requireUser(supabase, requestId, action);
-  if ('failure' in session) return session.failure;
-  const { userId } = session;
+  const owned = await ownedAccount(ctx, id);
+  if ('failure' in owned) return owned.failure;
+  if ((owned.value.archived_at !== null) === archived) return ok({ id });
 
-  const { data: account, error: readError } = await ownedAccount(
-    supabase,
-    userId,
-    id,
-  );
-  if (readError) {
-    return unexpected(
-      requestId,
-      action,
-      'account.read_failed',
-      readError.code,
-      userId,
-    );
-  }
-  if (!account) return NOT_FOUND;
-  if ((account.archived_at !== null) === archived) return ok({ id });
-
-  const { data, error } = await supabase
+  let write = supabase
     .from('accounts')
     .update({ archived_at: archived ? new Date().toISOString() : null })
     .eq('id', id)
-    .eq('user_id', userId)
-    .select('id');
+    .eq('user_id', userId);
+  write = archived
+    ? write.is('archived_at', null)
+    : write.not('archived_at', 'is', null);
+  const { data, error } = await write.select('id');
   if (error) {
-    return unexpected(
-      requestId,
-      action,
-      'account.write_failed',
-      error.code,
-      userId,
-    );
+    return unexpected(ctx, 'account.write_failed', error.code, userId);
   }
-  if (data.length !== 1) return NOT_FOUND;
+  if (data.length !== 1) {
+    // Lost a race: another request archived (or restored) it first, which
+    // is this request's outcome too — or the account was deleted meanwhile.
+    const again = await ownedAccount(ctx, id);
+    return 'failure' in again ? again.failure : ok({ id });
+  }
 
   revalidateForAccountRemoval(userId);
   logger.info(archived ? 'account.archived' : 'account.restored', {
-    requestId,
+    requestId: ctx.requestId,
     userId,
-    action,
+    action: ctx.action,
     outcome: 'success',
   });
   return ok({ id });
@@ -356,39 +339,23 @@ export async function restoreAccount(
 }
 
 /**
- * Deletes the account. In M2 no account can have a transaction; M3-B03 adds
+ * Deletes the account. The ownership re-check IS the write's user_id scope
+ * and its row count: a separate read first would add a round trip and answer
+ * the same question. In M2 no account can have a transaction; M3-B03 adds
  * the `blocked` result for one that does, with the `on delete restrict`
  * foreign key as the database backstop.
  */
 export async function deleteAccount(
   input: unknown,
 ): Promise<ActionResult<AccountRef>> {
-  const requestId = newRequestId();
-  const action = 'deleteAccount';
+  const started = await start('deleteAccount');
+  if ('failure' in started) return started.failure;
+  const ctx = started.value;
+  const { supabase, userId } = ctx;
+
   const parsed = accountIdSchema.safeParse(input);
   if (!parsed.success) return validationError(parsed.error);
   const { id } = parsed.data;
-
-  const supabase = await createServerSupabaseClient();
-  const session = await requireUser(supabase, requestId, action);
-  if ('failure' in session) return session.failure;
-  const { userId } = session;
-
-  const { data: account, error: readError } = await ownedAccount(
-    supabase,
-    userId,
-    id,
-  );
-  if (readError) {
-    return unexpected(
-      requestId,
-      action,
-      'account.read_failed',
-      readError.code,
-      userId,
-    );
-  }
-  if (!account) return NOT_FOUND;
 
   const { data, error } = await supabase
     .from('accounts')
@@ -397,21 +364,15 @@ export async function deleteAccount(
     .eq('user_id', userId)
     .select('id');
   if (error) {
-    return unexpected(
-      requestId,
-      action,
-      'account.write_failed',
-      error.code,
-      userId,
-    );
+    return unexpected(ctx, 'account.write_failed', error.code, userId);
   }
   if (data.length !== 1) return NOT_FOUND;
 
   revalidateForAccountRemoval(userId);
   logger.info('account.deleted', {
-    requestId,
+    requestId: ctx.requestId,
     userId,
-    action,
+    action: ctx.action,
     outcome: 'success',
   });
   return ok({ id });
