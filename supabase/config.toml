@@ -250,6 +250,14 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
+# Password recovery: the link carries a token hash that /auth/confirm verifies,
+# so it works on any device — unlike the default {{ .ConfirmationURL }}, whose
+# PKCE code only the requesting browser can exchange (code review of #55).
+# Hosted projects need the same template (docs/ops/environments.md).
+[auth.email.template.recovery]
+subject = "Reset your Where'd My Money Go password"
+content_path = "./supabase/templates/recovery.html"
+
 # Uncomment to customize email template
 # [auth.email.template.invite]
 # subject = "You have been invited"

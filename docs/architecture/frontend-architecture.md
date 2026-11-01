@@ -17,6 +17,7 @@ spec §32 brand direction).
 - [The server/client boundary](#the-serverclient-boundary)
 - [shadcn/ui conventions](#shadcnui-conventions)
 - [Chart isolation](#chart-isolation)
+- [Forms that call a Server Action](#forms-that-call-a-server-action)
 - [Design tokens](#design-tokens)
 - [App icon](#app-icon)
 - [Money formatting](#money-formatting)
@@ -167,6 +168,28 @@ Charts take **already-computed series** as props. Aggregation happens in
 rounding so category shares sum to exactly 100%
 ([../domain/money-and-rounding.md](../domain/money-and-rounding.md)).
 
+## Forms that call a Server Action
+
+Established by the auth pages (`M1-F01`/`F02`); follow it for every form.
+
+- **The page wires the action, the component renders the form.** `components/`
+  may not import `lib/server`, so a Server Component page defines a small
+  `'use server'` adapter and passes it to a client form as a prop. The adapter
+  picks only the form's own fields (`lib/utils/form-data.ts` — Next adds hidden
+  `$ACTION_…` inputs that a strict schema would reject) and converts the result
+  envelope into what the form renders (`app/(auth)/form-state.ts`).
+- **`useActionState`** drives submit, pending, and returned errors — which also
+  makes the form work **without JavaScript** (progressive enhancement,
+  E2E-tested).
+- **Inline validation uses the same schema as the action**
+  (`components/auth/use-field-validation.ts`): checked on blur and on submit; an
+  invalid form is not sent and focus moves to the first problem. On a valid
+  submit the client's verdicts are cleared, so the **server's** field errors are
+  what the form shows next.
+- **Field errors** are tied to the input with `aria-describedby` and
+  `aria-invalid`; a **form-level message** renders in a summary that takes focus
+  and is announced. Inputs are `h-11` (44px touch target).
+
 ## Design tokens
 
 CSS custom properties, defined once, consumed everywhere. Tailwind maps to them
@@ -281,6 +304,18 @@ Non-negotiable from M0, audited in `M9-F01`:
 | Motion | Respect `prefers-reduced-motion` |
 | Landmarks | One `<main>`, one `<h1>`, meaningful heading order |
 | Automated check | `axe` clean in CI |
+
+### Menus and popovers (from M1-F04)
+
+Two Radix defaults fail axe; the account menu shows the fix for every later one:
+
+- **Non-modal** (`<DropdownMenu modal={false}>`). A modal menu marks the rest of
+  the page `aria-hidden`, which axe reports as `aria-hidden-focus` — and the page
+  appears to lose its `<main>` and `<h1>`. The WAI-ARIA menu button pattern does
+  not hide the page.
+- **Portal inside a landmark** (`DropdownMenuContent`'s `container` prop). The
+  default portals to the end of `<body>`, outside every landmark, which fails
+  axe's `region` rule.
 
 ### Charts need a text equivalent
 

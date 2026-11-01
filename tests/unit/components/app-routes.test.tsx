@@ -9,7 +9,28 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
  * plain functions returning JSX, so they render here without a Next server.
  */
 
-vi.mock('next/navigation', () => ({ usePathname: () => '/dashboard' }));
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/dashboard',
+  redirect: (to: string) => {
+    throw new Error(`redirect ${to}`);
+  },
+}));
+// The layout reads the profile and passes the sign-out action down (M1-F04).
+const profileStub = { current: true };
+vi.mock('@/lib/server/queries/profile', () => ({
+  getProfile: () =>
+    !profileStub.current
+      ? Promise.resolve(null)
+      : Promise.resolve({
+          id: 'u-1',
+          email: 'ana@example.test',
+          displayName: 'Ana',
+          currency: 'PHP',
+          timezone: 'Asia/Manila',
+        }),
+  displayNameOf: (p: { displayName: string | null }) => p.displayName ?? 'You',
+}));
+vi.mock('@/lib/server/actions/auth', () => ({ signOut: vi.fn() }));
 
 afterEach(cleanup);
 
@@ -43,11 +64,8 @@ describe('placeholder routes', () => {
 describe('app shell layout', () => {
   async function renderShell() {
     const { default: AppLayout } = await import('@/app/(app)/layout');
-    return render(
-      <AppLayout>
-        <h1>Dashboard</h1>
-      </AppLayout>,
-    );
+    // An async Server Component: call it for its JSX, then render that.
+    return render(await AppLayout({ children: <h1>Dashboard</h1> }));
   }
 
   it('renders the page inside a single <main>', async () => {
@@ -75,5 +93,18 @@ describe('app shell layout', () => {
     expect(
       screen.getAllByRole('button', { name: /add transaction/i }),
     ).toHaveLength(2);
+  });
+});
+
+describe('app shell without a profile', () => {
+  it('signs the session out instead of rendering or looping to /login', async () => {
+    // Code review of #56: a valid token with no profile row used to throw on
+    // every page; /login would bounce back here through the proxy.
+    profileStub.current = false;
+    const { default: AppLayout } = await import('@/app/(app)/layout');
+    await expect(AppLayout({ children: null })).rejects.toThrow(
+      'redirect /auth/signout',
+    );
+    profileStub.current = true;
   });
 });

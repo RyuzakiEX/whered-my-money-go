@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest';
 const SHELL_DIRS = ['app/(app)', 'components/shell', 'components/theme'];
 
 const ALLOWED = new Set([
+  'components/shell/account-menu.tsx', // dropdown open state, keyboard (M1-F04)
   'components/shell/mobile-nav.tsx', // drawer open/close state
   'components/shell/nav-link.tsx', // usePathname() for aria-current
   'components/theme/theme-provider.tsx', // localStorage, matchMedia

@@ -29,3 +29,36 @@ export function canonicalTimeZone(value: string): string | null {
     return null;
   }
 }
+
+/**
+ * Modern IANA names that older ICU data (Node 22's included) leaves out of
+ * Intl.supportedValuesOf, listing only the legacy alias — yet accepts.
+ * Checked against Node 22.22 in M1-F05's code review.
+ */
+const MODERN_NAMES = [
+  'UTC',
+  'Asia/Kolkata',
+  'Asia/Kathmandu',
+  'Asia/Yangon',
+  'Asia/Ho_Chi_Minh',
+  'Europe/Kyiv',
+  'America/Nuuk',
+  'Pacific/Kanton',
+  'America/Argentina/Buenos_Aires',
+] as const;
+
+/**
+ * Suggestions for a timezone picker: the saved zone first, then UTC and the
+ * modern names above, then everything this runtime lists. Only names the
+ * schema accepts, each once.
+ */
+export function timeZoneOptions(saved: string): string[] {
+  const candidates = [
+    saved,
+    ...MODERN_NAMES,
+    ...Intl.supportedValuesOf('timeZone'),
+  ];
+  return Array.from(new Set(candidates)).filter(
+    (zone) => canonicalTimeZone(zone) !== null,
+  );
+}
