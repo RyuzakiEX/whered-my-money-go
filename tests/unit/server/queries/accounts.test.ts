@@ -86,3 +86,18 @@ describe('without a session', () => {
     expect(await getAccountBalances([ID])).toEqual(new Map());
   });
 });
+
+describe('the session error', () => {
+  it("carries Auth's error code for the caller to log", async () => {
+    const { SessionError } = await import('@/lib/server/auth/session');
+    getClaims.mockResolvedValue({
+      data: null,
+      error: { code: 'jwks_timeout' },
+    });
+    const error: unknown = await listAccounts().catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(SessionError);
+    expect((error as InstanceType<typeof SessionError>).code).toBe(
+      'jwks_timeout',
+    );
+  });
+});

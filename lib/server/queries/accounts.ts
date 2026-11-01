@@ -86,7 +86,10 @@ export async function getAccount(id: string): Promise<Account | null> {
 
 /**
  * Balances for a set of accounts, in one query. Ids that are malformed, missing,
- * or another user's are simply absent from the result.
+ * or another user's are simply absent from the result. Archived accounts are
+ * NOT filtered out: this answers for the ids it is given, and an archived
+ * account's own page still shows its balance. A total, a picker, or a Safe to
+ * Spend input must start from listAccounts(), which hides archived accounts.
  */
 export async function getAccountBalances(
   ids: readonly string[],
