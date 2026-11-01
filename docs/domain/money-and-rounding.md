@@ -466,6 +466,8 @@ export type CurrencyCode = 'PHP' | 'USD' | 'EUR' | 'JPY' | (string & {});
 //   type SupportedCurrency; isSupportedCurrency(code): code is SupportedCurrency
 //   currencyExponent(currency: SupportedCurrency): number   // JPY -> 0
 // The allowlist is mirrored by the profiles_currency_allowed constraint.
+// Built in M2-F01 (lib/core/money/arithmetic.ts): sumMinor, assertSameCurrency,
+//   MoneyError, MixedCurrencyError — what the first total needed.
 
 export interface Money {
   readonly minor: Minor;
