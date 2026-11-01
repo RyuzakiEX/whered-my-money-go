@@ -96,9 +96,13 @@ npx supabase link --project-ref qvqamjyjjcnvjsflvrsb   # back to preview
 
 **Production Auth** (set 2026-10-31): site URL and redirect allowlist are the
 production URL only; password minimum 8 with letters and digits; recent login
-required to change a password. **Email confirmation is ON** (Supabase's
-default) — with the built-in mailer, that means only the project's team can
-finish signing up. Turning it off, as on preview, is the maintainer's call.
+required to change a password. **Email confirmation is OFF** (the
+maintainer's decision, 2026-11-01, verified through the Management API): with
+the built-in mailer only the project's team receives mail, so with it on no
+visitor could finish signing up. The same consequences as preview apply —
+reset emails reach only the team, and sign-up reveals whether an email is
+registered ([security-model.md](../security/security-model.md)). Turning it
+back on needs a verified sending domain first.
 
 The local Supabase stack prints the same fixed anon and service keys for every
 developer on earth. They are demo values on a stack that is not
@@ -191,7 +195,7 @@ Ordered, because the ordering matters:
    Consequence: password-reset emails on preview still reach only the team.
    Real email for everyone needs a verified domain on a provider such as
    Resend — Resend's `onboarding@resend.dev` test sender has the same
-   own-address-only limit. Production decides separately, at M9-B06.
+   own-address-only limit. Production is also OFF, since 2026-11-01.
    **The recovery email template** (`supabase/templates/recovery.html`) sends
    a token-hash link that works on any device. Supabase refuses template
    changes on free-tier projects using the built-in mailer (`400: Email
