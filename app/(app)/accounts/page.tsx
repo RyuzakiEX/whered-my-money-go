@@ -54,19 +54,23 @@ export default async function AccountsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const profile = await getProfile();
+  // Independent reads, in parallel. One accounts query serves both lists:
+  // the archived count decides whether the toggle appears at all.
+  const [profile, search, accounts] = await Promise.all([
+    getProfile(),
+    searchParams,
+    listAccounts({ includeArchived: true }),
+  ]);
   if (!profile) redirect('/auth/signout');
 
   // `?archived=1` shows archived accounts; anything else is the default view,
   // so a hand-edited URL falls back instead of erroring.
-  const showArchived = (await searchParams)['archived'] === '1';
+  const showArchived = search['archived'] === '1';
 
-  // One query for both lists: the archived count decides whether the toggle
-  // appears at all.
-  const accounts = await listAccounts({ includeArchived: true });
   const active = accounts.filter((account) => account.archivedAt === null);
   const archived = accounts.filter((account) => account.archivedAt !== null);
   const excludedCount = active.filter((a) => a.excludeFromSafeToSpend).length;
+  const spendableCount = active.length - excludedCount;
 
   let totalMinor: Minor | null;
   try {
@@ -90,13 +94,27 @@ export default async function AccountsPage({
           aria-labelledby="empty-heading"
           className="flex flex-col items-start gap-3 rounded-xl border border-dashed p-6"
         >
-          <h2 id="empty-heading" className="text-lg font-medium">
-            No accounts yet. Let&apos;s fix that.
-          </h2>
-          <p className="text-muted-foreground">
-            An account is anywhere your money lives: your wallet, a bank, GCash.
-            Add one and we&apos;ll keep count.
-          </p>
+          {archived.length === 0 ? (
+            <>
+              <h2 id="empty-heading" className="text-lg font-medium">
+                No accounts yet. Let&apos;s fix that.
+              </h2>
+              <p className="text-muted-foreground">
+                An account is anywhere your money lives: your wallet, a bank,
+                GCash. Add one and we&apos;ll keep count.
+              </p>
+            </>
+          ) : (
+            <>
+              <h2 id="empty-heading" className="text-lg font-medium">
+                No active accounts right now.
+              </h2>
+              <p className="text-muted-foreground">
+                Everything you have is archived. Restore an account below, or
+                add a new one.
+              </p>
+            </>
+          )}
           <AddAccountButton />
         </section>
       ) : (
@@ -113,33 +131,31 @@ export default async function AccountsPage({
             </h2>
             {totalMinor === null ? (
               <p className="text-base">
-                Your accounts are in more than one currency, so we can&apos;t
-                add them into one total. Each account still shows its own
-                balance.
+                Some of your accounts aren&apos;t in {profile.currency}, your
+                profile currency, so we can&apos;t add them into one total. Each
+                account still shows its own balance.
               </p>
             ) : (
-              <p
-                data-testid="spendable-total"
-                className={cn(
-                  'text-4xl font-semibold tabular-nums',
-                  totalMinor < 0 && 'text-destructive',
-                )}
-              >
-                {formatMoney(totalMinor, profile.currency)}
-              </p>
+              <>
+                <p
+                  data-testid="spendable-total"
+                  className={cn(
+                    'text-4xl font-semibold tabular-nums',
+                    totalMinor < 0 && 'text-destructive',
+                  )}
+                >
+                  {formatMoney(totalMinor, profile.currency)}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {spendableCount === 0
+                    ? 'All your accounts are set aside, so none count as spendable.'
+                    : `Across ${plural(spendableCount, 'account you can spend from', 'accounts you can spend from')}.`}
+                  {spendableCount > 0 && excludedCount > 0
+                    ? ` ${plural(excludedCount, 'set-aside account is', 'set-aside accounts are')} not counted.`
+                    : null}
+                </p>
+              </>
             )}
-            <p className="text-sm text-muted-foreground">
-              Across{' '}
-              {plural(
-                active.length - excludedCount,
-                'account you can spend from',
-                'accounts you can spend from',
-              )}
-              .
-              {excludedCount > 0
-                ? ` ${plural(excludedCount, 'set-aside account is', 'set-aside accounts are')} not counted.`
-                : null}
-            </p>
           </section>
 
           <section

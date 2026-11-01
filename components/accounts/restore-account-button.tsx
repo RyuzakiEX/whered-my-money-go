@@ -24,7 +24,18 @@ export function RestoreAccountButton({
 
   function restore() {
     startTransition(async () => {
-      const result = await restoreAction();
+      let result: AccountActionResult;
+      try {
+        result = await restoreAction();
+      } catch {
+        // The request itself failed (offline, a deploy mid-click): no
+        // envelope came back, but the user still needs to hear about it.
+        result = {
+          ok: false,
+          message:
+            "We couldn't reach the server. Check your connection and try again.",
+        };
+      }
       if (result.ok) toast.success(`${accountName} is back. Welcome home.`);
       else toast.error(result.message);
     });

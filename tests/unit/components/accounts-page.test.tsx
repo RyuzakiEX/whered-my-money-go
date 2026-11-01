@@ -156,9 +156,44 @@ describe('accounts list (M2-F01)', () => {
     ]);
     await renderPage();
     expect(screen.queryByTestId('spendable-total')).toBeNull();
-    expect(screen.getByText(/more than one currency/)).toBeTruthy();
+    expect(
+      screen.getByText(/aren.t in PHP, your profile currency/),
+    ).toBeTruthy();
     // Each card still shows its own balance, in its own currency.
     expect(plain(document.body.textContent)).toContain('$50.00');
+  });
+
+  it('names the profile currency when every account is in another one', async () => {
+    // A currency change in Settings: all accounts USD, the profile PHP.
+    listAccounts.mockResolvedValue([
+      account({ name: 'Checking', currency: 'USD', balanceMinor: 5_000 }),
+      account({ name: 'Wallet', currency: 'USD', balanceMinor: 1_000 }),
+    ]);
+    await renderPage();
+    expect(screen.queryByTestId('spendable-total')).toBeNull();
+    expect(
+      screen.getByText(/aren.t in PHP, your profile currency/),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Across/)).toBeNull();
+  });
+
+  it('says so plainly when every active account is set aside', async () => {
+    listAccounts.mockResolvedValue([
+      account({
+        type: 'savings',
+        balanceMinor: 500_000,
+        excludeFromSafeToSpend: true,
+      }),
+    ]);
+    await renderPage();
+    expect(plain(screen.getByTestId('spendable-total').textContent)).toBe(
+      '₱0.00',
+    );
+    expect(
+      screen.getByText(
+        'All your accounts are set aside, so none count as spendable.',
+      ),
+    ).toBeTruthy();
   });
 
   describe('archived accounts', () => {
@@ -215,8 +250,12 @@ describe('accounts list (M2-F01)', () => {
     it('show the toggle even when every account is archived', async () => {
       listAccounts.mockResolvedValue([old()]);
       await renderPage();
+      // Not "no accounts yet": they have one, it is archived.
       expect(
-        screen.getByRole('heading', { name: /No accounts yet/ }),
+        screen.queryByRole('heading', { name: /No accounts yet/ }),
+      ).toBeNull();
+      expect(
+        screen.getByRole('heading', { name: 'No active accounts right now.' }),
       ).toBeTruthy();
       expect(
         screen.getByRole('link', { name: 'Show archived accounts' }),

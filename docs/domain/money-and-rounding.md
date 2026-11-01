@@ -381,7 +381,7 @@ export function formatMoney(
     compactZeroFraction?: boolean;
     /** Always show `+` for positives — used by the timeline. Default false. */
     signDisplay?: 'auto' | 'always';
-    /** BCP-47 locale. Defaults to the profile locale, then 'en-PH'. */
+    /** BCP-47 locale. Defaults to 'en-PH'; profiles has no locale column yet. */
     locale?: string;
   },
 ): string;
