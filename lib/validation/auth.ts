@@ -81,9 +81,22 @@ export const passwordUpdateSchema = z
     error: AUTH_MESSAGES.passwordMismatch,
   });
 
+/**
+ * The parameters an emailed auth link carries to /auth/confirm: a token hash
+ * (this app's recovery template) or a PKCE code (Supabase's default email),
+ * plus where to go next. Only `recovery` links are handled today.
+ */
+export const emailLinkSchema = z.strictObject({
+  tokenHash: z.string().min(1).max(512).optional(),
+  type: z.enum(['recovery']).optional(),
+  code: z.string().min(1).max(512).optional(),
+  next: z.string().max(2048).optional(),
+});
+
 export type SignUpInput = z.infer<typeof signUpSchema>;
 export type SignInInput = z.infer<typeof signInSchema>;
 export type PasswordResetRequestInput = z.infer<
   typeof passwordResetRequestSchema
 >;
 export type PasswordUpdateInput = z.infer<typeof passwordUpdateSchema>;
+export type EmailLinkInput = z.infer<typeof emailLinkSchema>;

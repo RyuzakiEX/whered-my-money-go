@@ -16,6 +16,7 @@
 
 import { redirect } from 'next/navigation';
 
+import { isRecentRecovery } from '@/lib/server/auth/recovery';
 import { logger, newRequestId } from '@/lib/server/logger';
 import {
   fail,
@@ -26,6 +27,7 @@ import {
 import { createServerSupabaseClient } from '@/lib/server/supabase/server';
 import { DEFAULT_SIGNED_IN_PATH, safeNextPath } from '@/lib/utils/routes';
 import {
+  emailLinkSchema,
   passwordResetRequestSchema,
   passwordUpdateSchema,
   signInSchema,
@@ -166,7 +168,9 @@ export async function requestPasswordReset(
   const supabase = await createServerSupabaseClient();
   const { error } = await supabase.auth.resetPasswordForEmail(
     parsed.data.email,
-    { redirectTo: `${siteUrl()}/auth/callback?next=/reset-password/update` },
+    // The recovery email template appends &token_hash=…&type=recovery to
+    // this (supabase/templates/recovery.html); /auth/confirm verifies it.
+    { redirectTo: `${siteUrl()}/auth/confirm?next=/reset-password/update` },
   );
   if (error) {
     // A rate limit is per-IP, not per-account, so reporting it leaks nothing.
@@ -182,37 +186,6 @@ export async function requestPasswordReset(
     });
   }
   return ok(null);
-}
-
-/** How recent a recovery-link sign-in must be to change the password. */
-const RECOVERY_WINDOW_SECONDS = 3600;
-
-/**
- * Methods a password-recovery link signs in with, observed against the local
- * stack. The emailed link (PKCE: verify, then /auth/callback exchanges the
- * code) yields `recovery`; verifying the link's token hash directly yields
- * `otp`. A password login yields `password`, which is refused. The MVP has no
- * other OTP sign-in, so `otp` also means "came from the link".
- *
- * `recovery` was missing at first: the integration test used the token-hash
- * path, and only M1-F03's E2E through the real email showed that genuine
- * resets were being refused.
- */
-const RECOVERY_METHODS: ReadonlySet<string> = new Set(['recovery', 'otp']);
-
-/** True when the session came from a password-recovery link in the last hour. */
-function isRecentRecovery(
-  amr: readonly (string | { method: string; timestamp: number })[] | undefined,
-): boolean {
-  const now = Math.floor(Date.now() / 1000);
-  return (amr ?? []).some(
-    (entry) =>
-      // A bare string (RFC 8176 form) has no timestamp, so its age cannot be
-      // checked: not accepted.
-      typeof entry !== 'string' &&
-      RECOVERY_METHODS.has(entry.method) &&
-      now - entry.timestamp <= RECOVERY_WINDOW_SECONDS,
-  );
 }
 
 /**
@@ -257,4 +230,50 @@ export async function updatePassword(
     userId: claims.sub,
   });
   redirect('/dashboard');
+}
+
+/**
+ * Completes an emailed auth link (M1-F03). Called by the Continue button on
+ * /auth/confirm — never by merely opening the link (security review of #55):
+ *
+ *  - Login CSRF: an attacker could otherwise send a victim the link for the
+ *    ATTACKER's own reset, and one click would sign the victim into the
+ *    attacker's account, where they might enter their own financial data.
+ *  - Link scanners: mail systems that pre-open links would spend the one-time
+ *    token before the user ever clicked.
+ *
+ * A Server Action is a same-origin POST (Next checks the Origin), so a
+ * cross-site page cannot submit it.
+ */
+export async function confirmEmailLink(input: unknown): Promise<never> {
+  const parsed = emailLinkSchema.safeParse(input);
+  const linkFailed = '/reset-password?link=expired';
+  if (!parsed.success) redirect(linkFailed);
+  const { tokenHash, type, code, next } = parsed.data;
+  const requestId = newRequestId();
+
+  const supabase = await createServerSupabaseClient();
+  let error: { code?: string | undefined } | null;
+  if (tokenHash && type) {
+    ({ error } = await supabase.auth.verifyOtp({
+      type,
+      token_hash: tokenHash,
+    }));
+  } else if (code) {
+    // Supabase's default email: works only in the browser that asked (PKCE).
+    ({ error } = await supabase.auth.exchangeCodeForSession(code));
+  } else {
+    redirect(linkFailed);
+  }
+
+  if (error) {
+    logger.warn('auth.confirm_failed', {
+      requestId,
+      action: 'confirmEmailLink',
+      outcome: 'failure',
+      errorCode: error.code ?? 'unknown',
+    });
+    redirect(linkFailed);
+  }
+  redirect(safeNextPath(next) ?? DEFAULT_SIGNED_IN_PATH);
 }
