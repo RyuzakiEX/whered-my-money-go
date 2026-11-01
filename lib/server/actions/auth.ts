@@ -24,6 +24,7 @@ import {
   type ActionResult,
 } from '@/lib/server/result';
 import { createServerSupabaseClient } from '@/lib/server/supabase/server';
+import { DEFAULT_SIGNED_IN_PATH, safeNextPath } from '@/lib/utils/routes';
 import {
   passwordResetRequestSchema,
   passwordUpdateSchema,
@@ -107,7 +108,15 @@ export async function signUp(input: unknown): Promise<ActionResult<never>> {
   redirect('/dashboard');
 }
 
-export async function signIn(input: unknown): Promise<ActionResult<never>> {
+/**
+ * `next` is where the user was going before /login (M1-F02). It passes the
+ * same same-origin check as the proxy, so the login form cannot be turned
+ * into an open redirect.
+ */
+export async function signIn(
+  input: unknown,
+  next?: string | null,
+): Promise<ActionResult<never>> {
   const parsed = signInSchema.safeParse(input);
   if (!parsed.success) return validationError(parsed.error);
   const requestId = newRequestId();
@@ -124,7 +133,7 @@ export async function signIn(input: unknown): Promise<ActionResult<never>> {
     outcome: 'success',
     userId: data.user.id,
   });
-  redirect('/dashboard');
+  redirect(safeNextPath(next) ?? DEFAULT_SIGNED_IN_PATH);
 }
 
 export async function signOut(): Promise<ActionResult<never>> {

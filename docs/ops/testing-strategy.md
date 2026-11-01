@@ -128,6 +128,22 @@ run. Locally there are no retries — a flaky test should be seen, not absorbed.
 Alongside the smoke test (`M0-B09`), `tests/e2e/shell.spec.ts` asserts the app
 shell's 768px breakpoint, the one `M0-F02` behaviour jsdom cannot see.
 
+**Sessions.** App pages need a session since `M1-B06`. `tests/e2e/session.ts`
+creates a fresh user per test through a real sign-up and hands the browser the
+exact cookies `@supabase/ssr` writes — never a shared fixture account, so tests
+run in parallel and repeat. **Accessibility** is checked with
+`@axe-core/playwright` (`tests/e2e/auth-pages.spec.ts`, from `M1-F01`): zero
+violations, at 1280px and 360px.
+
+**Local runs against `next dev` can time out on a cold route.** The dev server
+compiles each route on first request, and parallel workers hitting uncompiled
+routes can exceed the 30s test timeout. Observed in `M1-F01`: one local run in
+three failed two sign-up tests this way, while the same suite passed 54/54
+(three repeats, retries off) against a production build. CI always uses the
+production build. Locally, warm the routes or run
+`npm run build && CI=1 npx playwright test --retries=0` before calling a test
+flaky.
+
 **The suite is scoped to spec §31's nine questions.** Each gets one assertion,
 and each is owned by the milestone that makes it answerable:
 
