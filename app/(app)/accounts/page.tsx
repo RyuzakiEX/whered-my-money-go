@@ -4,24 +4,24 @@
 // A Server Component. The total is computed here by lib/core and arrives in
 // the markup as a formatted string; no component adds money up.
 
-import { PlusIcon } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { AccountCard } from '@/components/accounts/account-card';
+import { AccountDialog } from '@/components/accounts/account-dialog';
+import type { AccountFormValues } from '@/components/accounts/account-form';
 import { RestoreAccountButton } from '@/components/accounts/restore-account-button';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/components/ui/cn';
 import { spendableBalanceMinor } from '@/lib/core/accounts/spendable-balance';
 import { MixedCurrencyError } from '@/lib/core/money/arithmetic';
 import type { Minor } from '@/lib/core/money/parse';
-import { restoreAccount } from '@/lib/server/actions/accounts';
+import { createAccount, restoreAccount } from '@/lib/server/actions/accounts';
 import { listAccounts } from '@/lib/server/queries/accounts';
 import { getProfile } from '@/lib/server/queries/profile';
 import { formatMoney } from '@/lib/utils/format-money';
 
-import { toAccountActionResult } from './action-result';
+import { toAccountActionResult, toAccountFormResult } from './action-result';
 
 export const metadata: Metadata = { title: 'Accounts' };
 
@@ -34,19 +34,10 @@ async function restore(id: string) {
 const plural = (count: number, one: string, many: string) =>
   `${String(count)} ${count === 1 ? one : many}`;
 
-/** TODO(M2-F02): opens the create dialog. Inert until then. */
-function AddAccountButton({ className }: { className?: string }) {
-  return (
-    <Button
-      size="lg"
-      aria-disabled="true"
-      title="Adding accounts arrives with M2-F02"
-      className={cn('min-h-11', className)}
-    >
-      <PlusIcon aria-hidden />
-      Add account
-    </Button>
-  );
+/** The create dialog's save. Currency comes from the profile, in the action. */
+async function create(values: AccountFormValues) {
+  'use server';
+  return toAccountFormResult(await createAccount(values));
 }
 
 export default async function AccountsPage({
@@ -86,7 +77,13 @@ export default async function AccountsPage({
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">Accounts</h1>
-        {active.length > 0 ? <AddAccountButton /> : null}
+        {active.length > 0 ? (
+          <AccountDialog
+            mode="create"
+            currency={profile.currency}
+            saveAction={create}
+          />
+        ) : null}
       </div>
 
       {active.length === 0 ? (
@@ -115,7 +112,11 @@ export default async function AccountsPage({
               </p>
             </>
           )}
-          <AddAccountButton />
+          <AccountDialog
+            mode="create"
+            currency={profile.currency}
+            saveAction={create}
+          />
         </section>
       ) : (
         <>

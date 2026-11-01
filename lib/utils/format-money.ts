@@ -79,3 +79,27 @@ export function formatMoney(
     fractionDigits,
   ).format(major);
 }
+
+/** The currency's narrow symbol on its own — `₱` — for an input adornment. */
+export function currencySymbol(currency: string, locale = 'en-PH'): string {
+  return (
+    formatterFor(currency, locale, 'auto', 0)
+      .formatToParts(0)
+      .find((part) => part.type === 'currency')?.value ?? currency
+  );
+}
+
+/**
+ * Minor units as plain decimal text for an input to edit — `1000.50`, with no
+ * symbol and no grouping — which the parser reads back to the same value.
+ * Digits are written out from the integer, not through a float, so nothing
+ * can round on the way into a form the user will save.
+ */
+export function formatMinorForInput(minor: number, currency: string): string {
+  const exponent = exponentOf(currency);
+  const digits = String(Math.abs(minor)).padStart(exponent + 1, '0');
+  const sign = minor < 0 ? '-' : '';
+  if (exponent === 0) return `${sign}${digits}`;
+  const cut = digits.length - exponent;
+  return `${sign}${digits.slice(0, cut)}.${digits.slice(cut)}`;
+}
