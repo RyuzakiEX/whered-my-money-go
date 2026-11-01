@@ -114,3 +114,25 @@ describe('profileUpdateSchema', () => {
     }
   });
 });
+
+describe('timeZoneOptions', () => {
+  it('suggests UTC and modern zone names that Node 22 leaves out', async () => {
+    // Code review of #56: the datalist came straight from
+    // Intl.supportedValuesOf, which omits UTC and lists Asia/Calcutta but
+    // not Asia/Kolkata — names canonicalTimeZone accepts.
+    const { canonicalTimeZone, timeZoneOptions } =
+      await import('@/lib/validation/timezone');
+    const options = timeZoneOptions('Asia/Manila');
+    for (const zone of ['UTC', 'Asia/Kolkata', 'Europe/Kyiv', 'Asia/Manila']) {
+      expect(options).toContain(zone);
+    }
+    // Every suggestion is one the schema accepts, and none repeats.
+    for (const zone of options) expect(canonicalTimeZone(zone)).not.toBeNull();
+    expect(new Set(options).size).toBe(options.length);
+  });
+
+  it('keeps the saved zone first, even if it is an alias', async () => {
+    const { timeZoneOptions } = await import('@/lib/validation/timezone');
+    expect(timeZoneOptions('Asia/Calcutta')[0]).toBe('Asia/Calcutta');
+  });
+});
