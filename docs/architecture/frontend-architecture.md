@@ -189,6 +189,15 @@ Established by the auth pages (`M1-F01`/`F02`); follow it for every form.
 - **Field errors** are tied to the input with `aria-describedby` and
   `aria-invalid`; a **form-level message** renders in a summary that takes focus
   and is announced. Inputs are `h-11` (44px touch target).
+- **Forms in a dialog** (the account form, `M2-F02`) cannot work without
+  JavaScript — the dialog itself needs it — so they skip `useActionState` and
+  submit from a transition, as Settings > Profile does. The rest holds: the
+  page's adapter, the action's own schema on blur and submit, server field
+  errors on their fields. One component serves create and edit. Under 640px
+  the same Radix dialog is laid out as a bottom sheet by CSS, keeping one
+  focus trap, and on close focus returns to the trigger — or, if a save's
+  refresh removed that trigger, to the page's live one
+  (`data-account-trigger`).
 
 ## Design tokens
 
