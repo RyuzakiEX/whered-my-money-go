@@ -381,7 +381,7 @@ export function formatMoney(
     compactZeroFraction?: boolean;
     /** Always show `+` for positives — used by the timeline. Default false. */
     signDisplay?: 'auto' | 'always';
-    /** BCP-47 locale. Defaults to the profile locale, then 'en-PH'. */
+    /** BCP-47 locale. Defaults to 'en-PH'; profiles has no locale column yet. */
     locale?: string;
   },
 ): string;
@@ -466,6 +466,8 @@ export type CurrencyCode = 'PHP' | 'USD' | 'EUR' | 'JPY' | (string & {});
 //   type SupportedCurrency; isSupportedCurrency(code): code is SupportedCurrency
 //   currencyExponent(currency: SupportedCurrency): number   // JPY -> 0
 // The allowlist is mirrored by the profiles_currency_allowed constraint.
+// Built in M2-F01 (lib/core/money/arithmetic.ts): sumMinor, assertSameCurrency,
+//   MoneyError, MixedCurrencyError — what the first total needed.
 
 export interface Money {
   readonly minor: Minor;
