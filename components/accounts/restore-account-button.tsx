@@ -27,8 +27,17 @@ export function RestoreAccountButton({
   function restore() {
     startTransition(async () => {
       const result = await settle(restoreAction);
-      if (result.ok) toast.success(`${accountName} is back. Welcome home.`);
-      else toast.error(result.message);
+      if (result.ok) {
+        toast.success(`${accountName} is back. Welcome home.`);
+        // A restore always takes this button away — the card moves to the
+        // active list, the detail page's banner goes — so focus moves to
+        // the page heading rather than fall to <body>.
+        requestAnimationFrame(() => {
+          document.querySelector<HTMLElement>('main h1')?.focus();
+        });
+      } else {
+        toast.error(result.message);
+      }
       if (!result.ok && result.unconfirmed) router.refresh();
     });
   }

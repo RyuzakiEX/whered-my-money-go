@@ -33,7 +33,7 @@ edit, delete.
 | [x] | M2-F01 | `[M2][FE] Build the accounts list page` |
 | [x] | M2-F02 | `[M2][FE] Build the account create and edit dialog` |
 | [x] | M2-F03 | `[M2][FE] Build the delete and archive flow` |
-| [ ] | M2-F04 | `[M2][FE] Build the account detail page` |
+| [x] | M2-F04 | `[M2][FE] Build the account detail page` |
 | [ ] | M2-B07 | `[M2][DO] Add the account CRUD E2E test` |
 
 ## Tasks
