@@ -12,6 +12,8 @@ import type { Account } from '@/lib/core/types';
 
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 vi.mock('sonner', () => ({ toast }));
+const router = vi.hoisted(() => ({ refresh: vi.fn() }));
+vi.mock('next/navigation', () => ({ useRouter: () => router }));
 
 afterEach(() => {
   cleanup();
@@ -62,6 +64,23 @@ describe('AccountActionsMenu', () => {
     expect(menu).toBeTruthy();
   });
 
+  it('portals the open menu into <main>, outside the card', async () => {
+    render(
+      <main>
+        <div data-testid="card" className="relative z-10">
+          <AccountActionsMenu
+            accountName="GCash"
+            onArchive={vi.fn()}
+            deleteAction={vi.fn()}
+          />
+        </div>
+      </main>,
+    );
+    const menu = await openMenu('GCash');
+    expect(menu.closest('main')).toBeTruthy();
+    expect(screen.getByTestId('card').contains(menu)).toBe(false);
+  });
+
   it('offers only Delete for an archived account', async () => {
     render(<AccountActionsMenu accountName="Old" deleteAction={vi.fn()} />);
     await openMenu('Old');
@@ -110,7 +129,7 @@ describe('AccountActionsMenu', () => {
       );
       // Not by colour alone: the confirm says what it does.
       expect(
-        screen.getByRole('button', { name: 'Delete GCash' }).className,
+        screen.getByRole('button', { name: 'Delete account' }).className,
       ).toContain('destructive');
     });
 
@@ -121,7 +140,7 @@ describe('AccountActionsMenu', () => {
       await openDelete(deleteAction);
       expect(deleteAction).not.toHaveBeenCalled();
       await userEvent.click(
-        screen.getByRole('button', { name: 'Delete GCash' }),
+        screen.getByRole('button', { name: 'Delete account' }),
       );
       await waitFor(() => {
         expect(screen.queryByRole('alertdialog')).toBeNull();
@@ -154,7 +173,7 @@ describe('AccountActionsMenu', () => {
       const { action, settle } = controlled();
       await openDelete(action);
       await userEvent.click(
-        screen.getByRole('button', { name: 'Delete GCash' }),
+        screen.getByRole('button', { name: 'Delete account' }),
       );
       expect(
         screen.getByRole<HTMLButtonElement>('button', { name: 'Deleting…' })
@@ -173,16 +192,39 @@ describe('AccountActionsMenu', () => {
       expect(toast.success).not.toHaveBeenCalled();
     });
 
-    it('explains a failed request instead of failing silently', async () => {
+    it('does not claim nothing happened when the request itself fails', async () => {
       await openDelete(() => Promise.reject(new Error('offline')));
       await userEvent.click(
-        screen.getByRole('button', { name: 'Delete GCash' }),
+        screen.getByRole('button', { name: 'Delete account' }),
       );
       expect(
-        await screen.findByText(
-          /couldn't reach the server, so nothing was deleted/,
-        ),
+        await screen.findByText(/couldn't confirm that with the server/),
       ).toBeTruthy();
+      // The delete may have committed: show the truth, don't guess.
+      expect(router.refresh).toHaveBeenCalledTimes(1);
+    });
+
+    it('hands focus to the caller after a delete, not to its own trigger', async () => {
+      const onDeleted = vi.fn();
+      render(
+        <AccountActionsMenu
+          accountName="GCash"
+          onArchive={vi.fn()}
+          deleteAction={() => Promise.resolve({ ok: true })}
+          onDeleted={onDeleted}
+        />,
+      );
+      await openMenu('GCash');
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Delete' }));
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Delete account' }),
+      );
+      await waitFor(() => {
+        expect(onDeleted).toHaveBeenCalledTimes(1);
+      });
+      expect(document.activeElement).not.toBe(
+        screen.queryByRole('button', { name: 'Actions for GCash' }),
+      );
     });
   });
 });
@@ -247,6 +289,27 @@ describe('ActiveAccountList', () => {
     expect(total.parentElement?.getAttribute('aria-busy')).toBe('true');
     expect(total.textContent).toBe('₱1,500.00');
     await settle({ ok: true });
+  });
+
+  it('moves focus to the list heading, since the card it was on is gone', async () => {
+    renderList(() => Promise.resolve({ ok: true }));
+    await archiveGCash();
+    await waitFor(() => {
+      expect(document.activeElement).toBe(
+        screen.getByRole('heading', { name: 'Your accounts' }),
+      );
+    });
+  });
+
+  it('refreshes rather than guess when the archive request fails outright', async () => {
+    renderList(() => Promise.reject(new Error('offline')));
+    await archiveGCash();
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(
+        expect.stringMatching(/couldn't confirm/),
+      );
+    });
+    expect(router.refresh).toHaveBeenCalledTimes(1);
   });
 
   it('confirms with an Undo that restores the account', async () => {

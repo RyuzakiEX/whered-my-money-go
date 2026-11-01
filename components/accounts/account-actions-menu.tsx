@@ -14,6 +14,7 @@
 // this dialog into "it has N transactions; archive it instead".
 
 import { ArchiveIcon, EllipsisIcon, Trash2Icon } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 
@@ -34,10 +35,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-import type { AccountActionResult } from './action-result';
-
-const NETWORK_FAILURE =
-  "We couldn't reach the server, so nothing was deleted. Try again.";
+import { settle, type AccountActionResult } from './action-result';
 
 export function AccountActionsMenu({
   accountName,
@@ -49,38 +47,61 @@ export function AccountActionsMenu({
   /** Omitted for an archived account, which is restored rather than archived. */
   onArchive?: () => void;
   deleteAction: () => Promise<AccountActionResult>;
-  /** After a delete: e.g. leave the deleted account's own page. */
+  /**
+   * After a delete, once the dialog has closed: move focus (and leave the
+   * deleted account's own page). Without it, focus goes to the page <h1>.
+   */
   onDeleted?: () => void;
 }) {
-  // Inside this wrapper, not at the end of <body>: the menu stays within the
-  // page's landmark (axe `region`), as the account menu does.
-  const [container, setContainer] = useState<HTMLDivElement | null>(null);
+  // Portaled into <main>, not the end of <body>, so the menu stays within a
+  // landmark (axe `region`) — and not into the card, whose `z-10` actions box
+  // would let the next card paint over the open menu.
+  const [container, setContainer] = useState<HTMLElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const deletedRef = useRef(false);
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [pending, startTransition] = useTransition();
+  const router = useRouter();
 
   function confirmDelete() {
     setError(undefined);
     startTransition(async () => {
-      let result: AccountActionResult;
-      try {
-        result = await deleteAction();
-      } catch {
-        result = { ok: false, message: NETWORK_FAILURE };
-      }
+      const result = await settle(deleteAction);
       if (result.ok) {
+        deletedRef.current = true;
         setConfirming(false);
         toast.success(`${accountName} deleted. Clean slate.`);
-        onDeleted?.();
       } else {
         setError(result.message);
+        if (result.unconfirmed) router.refresh();
+      }
+    });
+  }
+
+  /** Radix has nothing to return focus to: the menu item has unmounted. */
+  function afterClose() {
+    // A successful delete takes this card away — whether or not the refresh
+    // has landed yet — so focus never goes back to its trigger.
+    const deleted = deletedRef.current;
+    deletedRef.current = false;
+    const trigger = triggerRef.current;
+    requestAnimationFrame(() => {
+      if (deleted) {
+        if (onDeleted) onDeleted();
+        else document.querySelector<HTMLElement>('main h1')?.focus();
+      } else {
+        trigger?.focus();
       }
     });
   }
 
   return (
-    <div ref={setContainer}>
+    <div
+      ref={(element) => {
+        setContainer(element?.closest('main') ?? null);
+      }}
+    >
       {/* Non-modal, as the WAI-ARIA menu button pattern: a modal menu hides
           the rest of the page from assistive tech. */}
       <DropdownMenu modal={false}>
@@ -128,16 +149,9 @@ export function AccountActionsMenu({
         }}
       >
         <AlertDialogContent
-          // Opened from a menu item that has since unmounted, so Radix has
-          // nothing to return focus to: back to the menu's trigger, or —
-          // when the delete took the card with it — to the page heading.
           onCloseAutoFocus={(event) => {
             event.preventDefault();
-            const trigger = triggerRef.current;
-            requestAnimationFrame(() => {
-              if (trigger?.isConnected) trigger.focus();
-              else document.querySelector<HTMLElement>('main h1')?.focus();
-            });
+            afterClose();
           }}
         >
           <AlertDialogHeader>
@@ -168,7 +182,9 @@ export function AccountActionsMenu({
               onClick={confirmDelete}
             >
               <Trash2Icon aria-hidden />
-              {pending ? 'Deleting…' : `Delete ${accountName}`}
+              {/* Not the name: a 60-character one would overflow the
+                  button. The title already names the account. */}
+              {pending ? 'Deleting…' : 'Delete account'}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

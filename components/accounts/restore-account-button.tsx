@@ -6,12 +6,13 @@
 // lib/server.
 
 import { ArchiveRestoreIcon } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useTransition } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 
-import type { AccountActionResult } from './action-result';
+import { settle, type AccountActionResult } from './action-result';
 
 export function RestoreAccountButton({
   accountName,
@@ -21,23 +22,14 @@ export function RestoreAccountButton({
   restoreAction: () => Promise<AccountActionResult>;
 }) {
   const [pending, startTransition] = useTransition();
+  const router = useRouter();
 
   function restore() {
     startTransition(async () => {
-      let result: AccountActionResult;
-      try {
-        result = await restoreAction();
-      } catch {
-        // The request itself failed (offline, a deploy mid-click): no
-        // envelope came back, but the user still needs to hear about it.
-        result = {
-          ok: false,
-          message:
-            "We couldn't reach the server. Check your connection and try again.",
-        };
-      }
+      const result = await settle(restoreAction);
       if (result.ok) toast.success(`${accountName} is back. Welcome home.`);
       else toast.error(result.message);
+      if (!result.ok && result.unconfirmed) router.refresh();
     });
   }
 

@@ -17,6 +17,7 @@ vi.mock('next/navigation', () => ({
   redirect: (to: string) => {
     throw new Error(`redirect ${to}`);
   },
+  useRouter: () => ({ refresh: vi.fn() }),
 }));
 const profile = { current: { currency: 'PHP' } as { currency: string } | null };
 vi.mock('@/lib/server/queries/profile', () => ({
