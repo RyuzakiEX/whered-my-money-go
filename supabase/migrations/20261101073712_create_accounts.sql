@@ -35,8 +35,9 @@ create table public.accounts (
   -- the client. char(3) pads, so 'US' becomes 'US ' and fails the allowlist.
   currency char(3) not null,
 
-  -- Required by spec §9: money set aside is not safe to spend. The Server
-  -- Action, not SQL, defaults it to true for savings accounts.
+  -- Required by spec §9: money set aside is not safe to spend. A new savings
+  -- account defaults to excluded in lib/validation/accounts.ts, not here, so
+  -- the form can show the default and the user can override it.
   exclude_from_safe_to_spend boolean not null default false,
 
   -- Archived when set. Archiving hides an account from pickers and totals
