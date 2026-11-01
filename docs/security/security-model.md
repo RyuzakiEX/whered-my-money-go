@@ -169,7 +169,7 @@ As built in M1-B05 (`lib/server/actions/auth.ts`):
 |---|---|---|
 | Sign-in | **Yes.** Wrong password, unknown email, and unconfirmed account return byte-identical envelopes | Integration test. Raw Auth answers the unconfirmed case differently (`email_not_confirmed`), which is exactly what the mapping hides |
 | Password reset | **Yes.** `{ ok: true }` whether or not the account exists | Integration test, plus Mailpit showing the real account did get the email |
-| Sign-up | **No, by nature** | With email confirmation off, signing up with a registered email fails while a new one succeeds. No wording hides that. The fix is email confirmation (Auth then answers both alike); deciding it for production is M9's |
+| Sign-up | **No, by nature** | With email confirmation off, signing up with a registered email fails while a new one succeeds. No wording hides that. The fix is email confirmation (Auth then answers both alike). Off on preview and production (2026-11-01) until a verified sending domain exists; revisit at M9-B06 |
 | Timing | **Not verified** | Auth may answer an unknown email faster than a wrong password. Not measured; mitigated, not closed, by the rate limits below |
 
 **Rate limiting posture (M1-B05).** No app-level limiter in the MVP; the
