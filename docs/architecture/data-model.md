@@ -755,7 +755,8 @@ merge. **Files are CLI-timestamped** (`20261030015135_create_profiles.sql`), as
 `0001`-style numbers below are the planned *order*, not filenames. As built:
 M1-B01/B02 landed `create_set_updated_at` (planned `0001`'s function),
 `create_profiles` + `enable_profiles_rls` (`0003`), and
-`create_profile_on_signup` (`0004`). `pgcrypto` needs no migration
+`create_profile_on_signup` (`0004`). M2-B01/B03 landed `create_accounts`
+(the `account_type` enum with its table) and `enable_accounts_rls` (`0005`). `pgcrypto` needs no migration
 (`gen_random_uuid()` is core since Postgres 13), and the enums of `0002` arrive
 with the tables that use them (M2-B01 onwards) — `profiles` uses none. Each row below names what a milestone's `type:contract` task
 lands, so a backend task is unambiguous about which file it creates. Protocol:

@@ -14,7 +14,7 @@ edit, delete.
 
 - [ ] A user can create, view, edit, archive, and delete accounts
 - [ ] Balances are derived, never a stored column — until [M3](m3-transactions-and-categories.md) creates transactions, an account's balance is its opening balance *(amended 2026-11-01: the `account_balances` view, transfer-leg correctness, and the index moved to M3 with M2-B02, because the view sums a table M3 creates)*
-- [ ] pgTAP proves user B cannot read, update, delete, or insert into user A's accounts
+- [x] pgTAP proves user B cannot read, update, delete, or insert into user A's accounts — *M2-B03; `supabase/tests/rls/accounts_test.sql`, each policy weakened in turn to watch it fail*
 - [ ] Two accounts cannot share a name case-insensitively within one user *(confirmed 2026-11-01 over data-model.md's earlier "not unique" — two identical names are indistinguishable in a picker)*
 - [ ] Opening balances are entered as decimal text and stored as integer minor units
 - [ ] Spec §31 Q1 — "How much money do I have?" — is answerable in the UI
@@ -25,8 +25,8 @@ edit, delete.
 
 | Done | ID | Title |
 |---|---|---|
-| [ ] | M2-B01 | `[M2][BE] Create account_type enum and accounts table` |
-| [ ] | M2-B03 | `[M2][BE] Add RLS policies for accounts` |
+| [x] | M2-B01 | `[M2][BE] Create account_type enum and accounts table` |
+| [x] | M2-B03 | `[M2][BE] Add RLS policies for accounts` |
 | [ ] | M2-B04 | `[M2][SH] Define account Zod schemas and domain types` |
 | [ ] | M2-B05 | `[M2][BE] Implement account queries and mappers` |
 | [ ] | M2-B06 | `[M2][BE] Implement account Server Actions` |

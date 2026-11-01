@@ -28,7 +28,21 @@ export type Database = {
           }
         },"public": {
           Tables: {
-            "profiles": {
+            "accounts": {
+                  Row: {
+                    "archived_at": string | null,"created_at": string,"currency": string,"exclude_from_safe_to_spend": boolean,"id": string,"name": string,"opening_balance_minor": number,"type": Database["public"]['Enums']["account_type"],"updated_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "archived_at"?: string | null,"created_at"?: string,"currency": string,"exclude_from_safe_to_spend"?: boolean,"id"?: string,"name": string,"opening_balance_minor"?: number,"type": Database["public"]['Enums']["account_type"],"updated_at"?: string,"user_id": string
+                  }
+                  Update: {
+                    "archived_at"?: string | null,"created_at"?: string,"currency"?: string,"exclude_from_safe_to_spend"?: boolean,"id"?: string,"name"?: string,"opening_balance_minor"?: number,"type"?: Database["public"]['Enums']["account_type"],"updated_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"profiles": {
                   Row: {
                     "created_at": string,"currency": string,"display_name": string | null,"id": string,"onboarding_completed_at": string | null,"timezone": string,"updated_at": string
                   }
@@ -51,7 +65,7 @@ export type Database = {
             [_ in never]: never
           }
           Enums: {
-            [_ in never]: never
+            "account_type": "cash"|"bank"|"ewallet"|"credit_card"|"savings"|"other"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -171,7 +185,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            
+            "account_type": ["cash", "bank", "ewallet", "credit_card", "savings", "other"]
           }
         }
 } as const
