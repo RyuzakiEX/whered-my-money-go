@@ -10,7 +10,7 @@
 // text here; the shared parser turns it into minor units, on submit here and
 // again in the action.
 
-import { useState, useTransition, type SubmitEvent } from 'react';
+import { useEffect, useState, useTransition, type SubmitEvent } from 'react';
 
 import {
   ErrorSummary,
@@ -33,6 +33,7 @@ import { currencySymbol } from '@/lib/utils/format-money';
 import {
   accountCreateSchema,
   accountUpdateSchema,
+  openingBalanceMinorOf,
 } from '@/lib/validation/accounts';
 
 import { ACCOUNT_TYPE_LABELS } from './account-types';
@@ -51,6 +52,8 @@ export type AccountSaveResult =
   | { ok: false; fields?: Record<string, string[]>; message?: string };
 
 type FieldName = keyof AccountFormValues;
+/** A field, or `_` for a problem that belongs to no single field. */
+type ErrorKey = FieldName | '_';
 const FIELD_ORDER: readonly FieldName[] = [
   'name',
   'type',
@@ -64,6 +67,8 @@ const TYPE_OPTION_LABELS: Readonly<Record<AccountType, string>> = {
   ewallet: 'E-wallet (GCash, Maya)',
 };
 
+const FORM_PROBLEM =
+  "Something in this form isn't right. Check it and try again.";
 const NETWORK_FAILURE =
   "We couldn't reach the server. Your details are still here; try again.";
 
@@ -81,6 +86,7 @@ export function AccountForm({
   currency,
   saveAction,
   onSaved,
+  onPendingChange,
 }: {
   mode: 'create' | 'edit';
   /** Edit mode only: validated with the update schema, which requires it. */
@@ -90,31 +96,49 @@ export function AccountForm({
   currency: SupportedCurrency;
   saveAction: (values: AccountFormValues) => Promise<AccountSaveResult>;
   onSaved: (values: AccountFormValues) => void;
+  /** Told when a save starts and ends, so the dialog can refuse to close. */
+  onPendingChange?: (pending: boolean) => void;
 }) {
   const [values, setValues] = useState(initial);
   // Create mode follows the type's default until the user decides: a savings
   // account starts excluded (data-model.md decision 5), anything else not.
   const [excludeTouched, setExcludeTouched] = useState(mode === 'edit');
-  const [errors, setErrors] = useState<Partial<Record<FieldName, string>>>({});
+  const [errors, setErrors] = useState<Partial<Record<ErrorKey, string>>>({});
   const [message, setMessage] = useState<string | undefined>();
   const [pending, startTransition] = useTransition();
 
-  const pristine = FIELD_ORDER.every((key) => values[key] === initial[key]);
-  const balanceChanged =
-    mode === 'edit' && values.openingBalance !== initial.openingBalance;
+  useEffect(() => {
+    onPendingChange?.(pending);
+  }, [pending, onPendingChange]);
+
+  // The same amount written differently (`1000.50`, `1,000.50`) is not a
+  // change: compare what the parser reads, falling back to the text.
+  const initialMinor = openingBalanceMinorOf(initial.openingBalance, currency);
+  const currentMinor = openingBalanceMinorOf(values.openingBalance, currency);
+  const balanceSame =
+    initialMinor !== null && currentMinor !== null
+      ? initialMinor === currentMinor
+      : values.openingBalance === initial.openingBalance;
+  const pristine =
+    balanceSame &&
+    FIELD_ORDER.every(
+      (key) => key === 'openingBalance' || values[key] === initial[key],
+    );
+  const balanceChanged = mode === 'edit' && !balanceSame;
 
   /** Every field's first error under the action's own schema. */
   function validate(
     next: AccountFormValues,
-  ): Partial<Record<FieldName, string>> {
+  ): Partial<Record<ErrorKey, string>> {
     const result =
       mode === 'create'
         ? accountCreateSchema(currency).safeParse(next)
         : accountUpdateSchema(currency).safeParse({ ...next, id: accountId });
-    const found: Partial<Record<FieldName, string>> = {};
+    const found: Partial<Record<ErrorKey, string>> = {};
     if (!result.success) {
       for (const issue of result.error.issues) {
-        const key = issue.path[0] as FieldName;
+        const head = issue.path[0];
+        const key = FIELD_ORDER.find((name) => name === head) ?? '_';
         found[key] ??= issue.message;
       }
     }
@@ -157,6 +181,10 @@ export function AccountForm({
       focusField(firstInvalid);
       return;
     }
+    if (found._) {
+      setMessage(FORM_PROBLEM);
+      return;
+    }
 
     startTransition(async () => {
       let result: AccountSaveResult;
@@ -182,7 +210,9 @@ export function AccountForm({
         result.message ??
           (firstServerError
             ? undefined
-            : "We couldn't save that. Nothing changed; try again."),
+            : result.fields
+              ? FORM_PROBLEM
+              : "We couldn't save that. Nothing changed; try again."),
       );
     });
   }
@@ -204,7 +234,6 @@ export function AccountForm({
         name="name"
         label="Name"
         autoComplete="off"
-        maxLength={80}
         description="What you call it, like GCash or BPI Savings."
         value={values.name}
         onChange={(e) => {
@@ -257,7 +286,6 @@ export function AccountForm({
             name="openingBalance"
             inputMode="decimal"
             autoComplete="off"
-            placeholder="0.00"
             className="h-11 pl-8"
             value={values.openingBalance}
             aria-invalid={errors.openingBalance ? true : undefined}
@@ -331,7 +359,12 @@ export function AccountForm({
 
       <DialogFooter className="max-sm:rounded-b-none">
         <DialogClose asChild>
-          <Button type="button" variant="outline" className="h-11">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11"
+            disabled={pending}
+          >
             Cancel
           </Button>
         </DialogClose>

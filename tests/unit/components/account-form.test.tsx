@@ -292,7 +292,56 @@ describe('AccountForm defaults and notes', () => {
   });
 });
 
+describe('AccountForm edit-mode comparisons', () => {
+  it('treats the same amount written differently as no change', async () => {
+    renderForm({
+      mode: 'edit',
+      accountId: ID,
+      initial: { ...EMPTY_ACCOUNT, name: 'Cash', openingBalance: '1000.50' },
+    });
+    await userEvent.clear(balanceInput());
+    await userEvent.type(balanceInput(), '1,000.50');
+    expect(screen.queryByText(/will shift/)).toBeNull();
+    expect(submit('Save changes').disabled).toBe(true);
+  });
+});
+
 describe('AccountDialog', () => {
+  it('cannot be closed while a save is in flight', async () => {
+    let settle: (r: AccountSaveResult) => void = () => undefined;
+    render(
+      <AccountDialog
+        mode="create"
+        currency="PHP"
+        saveAction={() =>
+          new Promise<AccountSaveResult>((resolve) => {
+            settle = resolve;
+          })
+        }
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Add account' }));
+    const dialog = screen.getByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('Name'), 'BPI');
+    await userEvent.type(within(dialog).getByLabelText('Opening balance'), '1');
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Add account' }),
+    );
+    expect(
+      within(dialog).getByRole<HTMLButtonElement>('button', { name: 'Cancel' })
+        .disabled,
+    ).toBe(true);
+    await userEvent.keyboard('{Escape}');
+    expect(screen.getByRole('dialog')).toBeTruthy();
+
+    await act(async () => {
+      settle({ ok: false, message: 'Server said no.' });
+      await Promise.resolve();
+    });
+    // The outcome is shown, in the dialog that is still open.
+    expect(await within(dialog).findByText('Server said no.')).toBeTruthy();
+  });
+
   it('moves focus to the live trigger when saving replaced its own', async () => {
     // The first account swaps the empty state for the list: the trigger the
     // user clicked unmounts, and the header's takes its place.

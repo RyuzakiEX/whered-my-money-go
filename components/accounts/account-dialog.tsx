@@ -8,7 +8,7 @@
 // media-query hook that would render differently on the server.
 
 import { PencilIcon, PlusIcon } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -50,7 +50,8 @@ type DialogProps = {
 /**
  * Where focus goes when the dialog closes: its trigger, or — when saving the
  * first account swapped the empty state for the list and took that trigger
- * with it — the page's live trigger for the same mode. Never left on <body>.
+ * with it — the page's live "Add account". Only create has a fallback: an
+ * edit trigger is per account, and the first one found could be another's.
  */
 function restoreFocus(trigger: HTMLElement | null, mode: 'create' | 'edit') {
   requestAnimationFrame(() => {
@@ -59,9 +60,9 @@ function restoreFocus(trigger: HTMLElement | null, mode: 'create' | 'edit') {
       return;
     }
     const active = document.activeElement;
-    if (active && active !== document.body) return;
+    if (mode !== 'create' || (active && active !== document.body)) return;
     document
-      .querySelector<HTMLElement>(`[data-account-trigger="${mode}"]`)
+      .querySelector<HTMLElement>('[data-account-trigger="create"]')
       ?.focus();
   });
 }
@@ -71,6 +72,12 @@ export function AccountDialog(props: DialogProps) {
   const { mode, currency, saveAction, triggerClassName } = props;
   const editing = mode === 'edit';
   const triggerRef = useRef<HTMLButtonElement>(null);
+  // A save in flight cannot be abandoned: closing would hide its outcome,
+  // and the account may already exist.
+  const pendingRef = useRef(false);
+  const onPendingChange = useCallback((pending: boolean) => {
+    pendingRef.current = pending;
+  }, []);
 
   function onSaved(values: AccountFormValues) {
     setOpen(false);
@@ -82,7 +89,13 @@ export function AccountDialog(props: DialogProps) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next && pendingRef.current) return;
+        setOpen(next);
+      }}
+    >
       <DialogTrigger asChild>
         <Button
           ref={triggerRef}
@@ -119,6 +132,7 @@ export function AccountDialog(props: DialogProps) {
           currency={currency}
           saveAction={saveAction}
           onSaved={onSaved}
+          onPendingChange={onPendingChange}
           {...(editing
             ? { accountId: props.accountId, initial: props.initial }
             : { initial: EMPTY_ACCOUNT })}
