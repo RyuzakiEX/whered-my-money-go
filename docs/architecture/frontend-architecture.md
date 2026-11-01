@@ -115,6 +115,8 @@ Primitives installed by M0-F01 (style `radix-nova`): `button`, `input`,
 `label`, `select`, `dialog`, `sheet`, `drawer`, `dropdown-menu`, `popover`,
 `table`, `card`, `badge`, `progress`, `skeleton`, `sonner` (shadcn's toast),
 `tabs`, `field`, `alert`, and `separator` (a dependency of `field`).
+`alert-dialog` was added by M2-F03, with the pinned CLI
+(`npx shadcn add alert-dialog`, declining to overwrite `button`).
 
 - **`field`, not `form`.** In the current registry `form` is an empty stub;
   `field` replaces it — label, description, and an accessible error, with no
@@ -324,6 +326,28 @@ Two Radix defaults fail axe; the account menu shows the fix for every later one:
 - **Portal inside a landmark** (`DropdownMenuContent`'s `container` prop). The
   default portals to the end of `<body>`, outside every landmark, which fails
   axe's `region` rule.
+
+### Destructive actions (from M2-F03)
+
+The account delete flow sets the pattern for every irreversible action:
+
+- **Confirm in an alert dialog that names the thing** — "Delete GCash?", not
+  "Delete this account?" — and says what cannot be undone. Radix focuses
+  Cancel on open, never the destructive button.
+- **The confirm is a plain `Button`, not `AlertDialogAction`**, which would
+  close the dialog before the server answers. The dialog stays open, refuses
+  to close mid-request, and shows a refusal where the user is looking.
+- **Colour is never the only signal:** the button says "Delete GCash" and
+  carries a trash icon.
+- **shadcn's `destructive` variants are below AA in the light theme** — red
+  on a 10% red tint is 3.99:1, red on `accent` 4.37:1. A destructive confirm
+  is solid `bg-destructive text-primary-foreground`, a pair the contrast test
+  asserts; a destructive menu item takes the `accent` pair when focused.
+- **Focus after close:** a dialog opened from a menu item has nothing for
+  Radix to return focus to, so it goes back to the menu trigger — or, when
+  the action removed that trigger's card, to the page `<h1>` (`tabIndex={-1}`).
+- **Undoable actions skip the confirmation** (archive) and offer Undo in the
+  toast instead.
 
 ### Charts need a text equivalent
 

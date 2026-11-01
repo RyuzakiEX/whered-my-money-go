@@ -40,6 +40,11 @@ const PAIRS: [string, string, number][] = [
   ['muted-foreground', 'card', TEXT],
   ['destructive', 'background', TEXT],
   ['destructive', 'card', TEXT],
+  ['destructive', 'popover', TEXT],
+  // The solid confirm button in a delete dialog (M2-F03). shadcn's
+  // `destructive` variant — red text on a 10% red tint — is 3.99:1 in the
+  // light theme, below AA, so destructive confirms use this pair instead.
+  ['primary-foreground', 'destructive', TEXT],
 
   // Money direction and status bands are carried by text, never colour alone
   // — but when colour IS used, it has to be readable.
