@@ -138,8 +138,32 @@ describe('accountCreateSchema', () => {
     },
   );
 
-  it('requires every field', () => {
-    for (const key of Object.keys(valid)) {
+  it('defaults a savings account to excluded from Safe to Spend when unset', () => {
+    const unset = { name: valid.name, openingBalance: valid.openingBalance };
+    expect(
+      php.safeParse({ ...unset, type: 'savings' }).data?.excludeFromSafeToSpend,
+    ).toBe(true);
+    expect(
+      php.safeParse({ ...unset, type: 'bank' }).data?.excludeFromSafeToSpend,
+    ).toBe(false);
+  });
+
+  it('keeps an explicit choice, savings or not', () => {
+    expect(
+      php.safeParse({
+        ...valid,
+        type: 'savings',
+        excludeFromSafeToSpend: false,
+      }).data?.excludeFromSafeToSpend,
+    ).toBe(false);
+    expect(
+      php.safeParse({ ...valid, type: 'cash', excludeFromSafeToSpend: true })
+        .data?.excludeFromSafeToSpend,
+    ).toBe(true);
+  });
+
+  it('requires every field but the Safe to Spend choice', () => {
+    for (const key of ['name', 'type', 'openingBalance']) {
       const partial = Object.fromEntries(
         Object.entries(valid).filter(([k]) => k !== key),
       );

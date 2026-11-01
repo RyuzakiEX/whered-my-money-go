@@ -121,8 +121,24 @@ function withMinorBalance<T extends { openingBalance: number }>({
   return { ...rest, openingBalanceMinor: openingBalance };
 }
 
+/**
+ * Unset, a savings account starts excluded from Safe to Spend — an emergency
+ * fund is not spending money (data-model.md decision 5) — and anything else
+ * starts included. The form shows that default; the user can override it.
+ */
 export function accountCreateSchema(currency: SupportedCurrency) {
-  return z.strictObject(accountFields(currency)).transform(withMinorBalance);
+  return z
+    .strictObject({
+      ...accountFields(currency),
+      excludeFromSafeToSpend: z.boolean().optional(),
+    })
+    .transform(({ excludeFromSafeToSpend, ...rest }) =>
+      withMinorBalance({
+        ...rest,
+        excludeFromSafeToSpend:
+          excludeFromSafeToSpend ?? rest.type === 'savings',
+      }),
+    );
 }
 
 export function accountUpdateSchema(currency: SupportedCurrency) {
