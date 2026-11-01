@@ -21,8 +21,19 @@ function card(page: Page, name: string) {
     .filter({ has: page.getByRole('link', { name, exact: true }) });
 }
 
+/** The figure itself, matched exactly: a substring would pass `-₱…`. */
 function total(page: Page) {
-  return page.getByRole('region', { name: 'Spendable total' });
+  return page
+    .getByRole('region', { name: 'Spendable total' })
+    .getByTestId('spendable-total');
+}
+
+/**
+ * A card's balance line, matched as a whole string — "Balance: ₱1,500.50" —
+ * so `-₱1,500.50` or `₱11,500.50` cannot pass for it.
+ */
+function balanceOn(page: Page, name: string, amount: string) {
+  return card(page, name).getByText(`Balance: ${amount}`, { exact: true });
 }
 
 async function addAccount(
@@ -84,17 +95,17 @@ test('create, view, edit, archive, restore, and delete accounts', async ({
     ]) {
       const dialog = await addAccount(page, account);
       await expect(dialog).toBeHidden(AFTER_SUBMIT);
-      await expect(card(page, account.name)).toBeVisible();
+      await expect(card(page, account.name)).toBeVisible(AFTER_SUBMIT);
     }
   });
 
   await test.step('each card shows its balance; the total is their sum (Q1)', async () => {
-    await expect(card(page, 'Cash')).toContainText('₱1,500.50');
-    await expect(card(page, 'BPI')).toContainText('₱20,000.00');
-    await expect(card(page, 'GCash')).toContainText('₱750.25');
+    await expect(balanceOn(page, 'Cash', '₱1,500.50')).toBeVisible();
+    await expect(balanceOn(page, 'BPI', '₱20,000.00')).toBeVisible();
+    await expect(balanceOn(page, 'GCash', '₱750.25')).toBeVisible();
     await expect(card(page, 'GCash')).toContainText('E-wallet');
     // 150050 + 2000000 + 75025 = 2225075 minor units.
-    await expect(total(page)).toContainText('₱22,250.75');
+    await expect(total(page)).toHaveText('₱22,250.75');
   });
 
   await test.step('edit a name and balance; list and detail both update', async () => {
@@ -102,8 +113,8 @@ test('create, view, edit, archive, restore, and delete accounts', async ({
     await expect(
       page.getByRole('heading', { level: 1, name: 'BPI' }),
     ).toBeVisible();
-    await page.getByRole('button', { name: 'Edit' }).click();
-    const dialog = page.getByRole('dialog', { name: 'Edit BPI' });
+    await page.getByRole('button', { name: 'Edit', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Edit BPI', exact: true });
     await expect(dialog.getByLabel('Opening balance')).toHaveValue('20000.00');
     await dialog.getByLabel('Name').fill('BPI Savings');
     await dialog.getByLabel('Opening balance').fill('25,000.10');
@@ -113,15 +124,16 @@ test('create, view, edit, archive, restore, and delete accounts', async ({
     await expect(
       page.getByRole('heading', { level: 1, name: 'BPI Savings' }),
     ).toBeVisible();
-    await expect(
-      page.getByRole('region', { name: 'Current balance' }),
-    ).toContainText('₱25,000.10');
+    // The derived current balance, not the region: that also holds the
+    // opening-balance row, which would pass on its own.
+    await expect(page.getByTestId('current-balance')).toHaveText('₱25,000.10');
+    await expect(page.getByTestId('opening-balance')).toHaveText('₱25,000.10');
 
     await page.getByRole('link', { name: 'All accounts' }).click();
-    await expect(card(page, 'BPI Savings')).toContainText('₱25,000.10');
+    await expect(balanceOn(page, 'BPI Savings', '₱25,000.10')).toBeVisible();
     await expect(card(page, 'BPI')).toHaveCount(0);
     // 150050 + 2500010 + 75025 = 2725085.
-    await expect(total(page)).toContainText('₱27,250.85');
+    await expect(total(page)).toHaveText('₱27,250.85');
   });
 
   await test.step('a name differing only in case is refused inline', async () => {
@@ -145,13 +157,23 @@ test('create, view, edit, archive, restore, and delete accounts', async ({
     await openActions(page, 'Cash');
     await page.getByRole('menuitem', { name: 'Archive' }).click();
     await expect(card(page, 'Cash')).toHaveCount(0);
+    // The hide is optimistic; the toast and the total are the server's word.
+    await expect(
+      page.getByText("Cash archived. It's resting, not gone."),
+    ).toBeVisible(AFTER_SUBMIT);
     // 2725085 - 150050 = 2575035.
-    await expect(total(page)).toContainText('₱25,750.35', AFTER_SUBMIT);
+    await expect(total(page)).toHaveText('₱25,750.35', AFTER_SUBMIT);
 
     await page.getByRole('link', { name: 'Show archived accounts' }).click();
     await expect(page).toHaveURL(/\?archived=1$/);
+    await expect(
+      page.getByRole('region', { name: /^Archived/ }).getByRole('link', {
+        name: 'Cash',
+        exact: true,
+      }),
+    ).toBeVisible();
     await page.getByRole('button', { name: 'Restore Cash' }).click();
-    await expect(total(page)).toContainText('₱27,250.85', AFTER_SUBMIT);
+    await expect(total(page)).toHaveText('₱27,250.85', AFTER_SUBMIT);
     await expect(
       page.getByRole('region', { name: 'Your accounts' }).getByRole('link', {
         name: 'Cash',
@@ -174,6 +196,6 @@ test('create, view, edit, archive, restore, and delete accounts', async ({
     await expect(card(page, 'Cash')).toBeVisible();
     await expect(card(page, 'GCash')).toHaveCount(0);
     // 2725085 - 75025 = 2650060.
-    await expect(total(page)).toContainText('₱26,500.60');
+    await expect(total(page)).toHaveText('₱26,500.60');
   });
 });

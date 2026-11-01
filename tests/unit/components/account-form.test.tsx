@@ -307,6 +307,35 @@ describe('AccountForm edit-mode comparisons', () => {
 });
 
 describe('AccountDialog', () => {
+  it('closes on Escape straight after a refused save', async () => {
+    render(
+      <AccountDialog
+        mode="create"
+        currency="PHP"
+        saveAction={() =>
+          Promise.resolve({ ok: false, fields: { name: ['Taken.'] } })
+        }
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Add account' }));
+    const dialog = screen.getByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('Name'), 'BPI');
+    await userEvent.type(within(dialog).getByLabelText('Opening balance'), '1');
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Add account' }),
+    );
+    // As soon as the error has focus — no waiting for anything else.
+    await waitFor(() => {
+      expect(document.activeElement).toBe(
+        within(dialog).getByLabelText('Name'),
+      );
+    });
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+  });
+
   it('cannot be closed while a save is in flight', async () => {
     let settle: (r: AccountSaveResult) => void = () => undefined;
     render(
