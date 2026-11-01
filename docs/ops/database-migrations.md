@@ -131,18 +131,18 @@ unambiguous about sequencing.
 | Milestone | Creates |
 |---|---|
 | **M1** | `profiles` + `on auth.users` trigger + `set_updated_at()` shared trigger; `profiles` RLS |
-| **M2** | `account_type` enum; `accounts`; `account_balances` view; `accounts` RLS |
-| **M3** | `category_type`, `transaction_type` enums; `categories`; `transactions`; default-category seeding; RLS **including cross-table ownership** |
+| **M2** | `account_type` enum; `accounts` (incl. `exclude_from_safe_to_spend`); `accounts` RLS |
+| **M3** | `category_type`, `transaction_type` enums; `categories`; `transactions`; default-category seeding; RLS **including cross-table ownership**; `account_balances` view (M2-B02, moved here) |
 | **M5** | `budget_period` enum; `budgets`; RLS with category-ownership check |
 | **M6** | `goal_status` enum; `goals`; `goal_contributions`; RLS with transitive goal-ownership check |
-| **M7** | `accounts.exclude_from_safe_to_spend`; scheduled-transaction support |
+| **M7** | Scheduled-transaction support |
 | **M8** | `recurrence_frequency` enum; `recurring_transactions`; RLS |
 | **V2** | `audit_log` |
 
-Note `account_balances` (M2) depends on `transactions` (M3). Resolve by creating
-the view in M3 after the table, or by creating it in M2 in a form that degrades
-gracefully — the dependency is called out in `M2-B02`'s acceptance criteria so
-it is handled deliberately.
+`account_balances` depends on `transactions`, so it is created in M3 after the
+table (decided 2026-11-01). The task keeps its ID, `M2-B02`, and now sits in
+M3's backlog. Until it lands, an account's balance is its opening balance —
+correct, since no transactions can exist yet.
 
 ## Seeds
 

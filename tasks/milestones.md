@@ -19,8 +19,8 @@ cannot be demonstrated, it was scoped wrong.
 |---|---|---|---|---|---|
 | **M0** | [Foundation & Toolchain](backlog/m0-foundation.md) | `██████████` | 14/14 | 100% | done |
 | **M1** | [Auth & Profile](backlog/m1-auth-and-profile.md) | `██████████` | 13/13 | 100% | done |
-| **M2** | [Accounts](backlog/m2-accounts.md) | `░░░░░░░░░░` | 0/11 | 0% | not started |
-| **M3** | [Transactions & Categories](backlog/m3-transactions-and-categories.md) | `░░░░░░░░░░` | 0/15 | 0% | not started |
+| **M2** | [Accounts](backlog/m2-accounts.md) | `░░░░░░░░░░` | 0/10 | 0% | not started |
+| **M3** | [Transactions & Categories](backlog/m3-transactions-and-categories.md) | `░░░░░░░░░░` | 0/16 | 0% | not started |
 | **M4** | [Dashboard Core](backlog/m4-dashboard-core.md) | `░░░░░░░░░░` | 0/10 | 0% | not started |
 | **M5** | [Budgets](backlog/m5-budgets.md) | `░░░░░░░░░░` | 0/10 | 0% | not started |
 | **M6** | [Savings Goals](backlog/m6-goals.md) | `░░░░░░░░░░` | 0/10 | 0% | not started |

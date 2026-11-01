@@ -463,7 +463,7 @@ cases in this schema:
 | `accounts.opening_balance_minor` | Balance rewritten from the client. Every derived number changes ([data-model.md](data-model.md#4-opening-balance-is-stored-current-balance-is-derived)) |
 | `accounts.exclude_from_safe_to_spend` | Safe to Spend manipulated through a form that does not expose the field |
 | `goals.achieved_at` | Fabricated achievement history |
-| `is_default`, `is_archived` | State the UI never offers, set anyway |
+| `is_default`, `archived_at` | State the UI never offers, set anyway |
 | `created_at` | Rewritten audit trail |
 
 So: name every column, every time.
@@ -473,9 +473,8 @@ So: name every column, every time.
 const patch = {
   name: data.name,
   type: data.type,
-  currency: data.currency,
+  opening_balance_minor: data.openingBalanceMinor,
   exclude_from_safe_to_spend: data.excludeFromSafeToSpend,
-  display_order: data.displayOrder,
 } satisfies AccountUpdate;
 
 await supabase.from('accounts').update(patch).eq('id', accountId);
@@ -489,7 +488,7 @@ it should.
 // ❌ `*` — today's shape is not tomorrow's.
 .select()
 // ✅ Named columns, matching what the mapper consumes.
-.select('id, name, type, currency, exclude_from_safe_to_spend, is_archived')
+.select('id, name, type, currency, exclude_from_safe_to_spend, archived_at')
 ```
 
 `satisfies` rather than `as`: `as` silences the compiler, `satisfies` checks the
@@ -617,12 +616,12 @@ async function verifyTransactionRefs(
   // RLS-scoped: another user's account simply is not visible here.
   const { data: account } = await supabase
     .from('accounts')
-    .select('id, currency, is_archived')
+    .select('id, currency, archived_at')
     .eq('id', data.accountId)
     .maybeSingle();
 
   if (!account) return err('not_found', 'account');   // not `forbidden`
-  if (account.is_archived) {
+  if (account.archived_at !== null) {
     return err('conflict', 'account_archived',
       'That account is archived. Unarchive it to add transactions.');
   }
@@ -678,7 +677,7 @@ the application should have caught is a bug report from the database.
   matter (sign-up, password reset). The `rate_limited` envelope variant exists so
   adding it later needs no client change. Tracked in
   [M8](../../tasks/backlog/m9-mvp-hardening-and-launch.md).
-- **No soft-delete API semantics.** `is_archived` on accounts and categories;
+- **No soft-delete API semantics.** `archived_at` on accounts and categories;
   everything else is a real delete.
   [data-model.md](data-model.md#what-is-deliberately-absent).
 - **No idempotency keys yet.** Optimistic UI plus `revalidateTag` makes a double

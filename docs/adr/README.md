@@ -15,12 +15,7 @@ choice from an accident.
 | [0004](0004-testing-stack-vitest-playwright.md) | Vitest for unit and integration, Playwright for E2E | Accepted | 2026-09-09 |
 | [0005](0005-money-as-integer-minor-units.md) | Money is stored and computed as integer minor units | Accepted | 2026-09-09 |
 | [0006](0006-docs-ci-first-scaffold.md) | Documentation and CI land before application code | Accepted | 2026-09-09 |
-
-Candidate, not yet written:
-
-| # | Decision | Status |
-|---|---|---|
-| 0007 | Account balances derived from transactions rather than stored | Proposed — reasoning in [../architecture/data-model.md](../architecture/data-model.md) |
+| [0007](0007-derived-account-balances.md) | Account balances are derived from the ledger, never stored | Accepted | 2026-11-01 |
 
 ## When to write one
 
