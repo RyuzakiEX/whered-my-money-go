@@ -361,7 +361,11 @@ export type ActionError =
 password-reset failure returns, so the response never reveals whether an
 account exists ([security-model.md](../security/security-model.md#t7--account-enumeration)).
 `not_found` and `conflict` are added with the first action that can return
-them, rather than shipped unused.
+them, rather than shipped unused. **M2-B06** added `not_found` (with
+`EntityName = 'account'`). A duplicate account name is answered as a
+`validation` error on the `name` field, naming the existing account, because
+the form renders it inline. It also added `conflict`, with the one reason
+`account_archived`: an archived account is read-only until restored.
 
 Why a union rather than exceptions:
 

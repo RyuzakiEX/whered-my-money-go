@@ -20,6 +20,11 @@ export function toFormState(result: ActionResult<unknown>): FormState {
       };
     case 'unauthenticated':
       return { message: 'Your session ended. Log in and try again.' };
+    // Auth actions never return these; listed so the switch stays exhaustive.
+    case 'not_found':
+      return { message: "We couldn't find that. Refresh and try again." };
+    case 'conflict':
+      return { message: error.message };
     case 'unexpected':
       return {
         message: `Something went wrong on our side. Try again, and if it keeps happening, mention code ${error.correlationId}.`,

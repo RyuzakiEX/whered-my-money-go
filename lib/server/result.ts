@@ -12,12 +12,26 @@ export type ActionResult<T> =
 export type ActionError =
   | { kind: 'validation'; fields: Record<string, string[]> }
   | { kind: 'unauthenticated' }
+  // The record is missing OR belongs to another user — deliberately one
+  // answer, so ids cannot be probed. There is no `forbidden` kind, so that
+  // distinction cannot be returned by accident
+  // (docs/architecture/api-and-data-access.md#never-leak-whether-a-record-exists).
+  | { kind: 'not_found'; entity: EntityName }
+  // The request is well-formed and the record is theirs, but its state
+  // forbids the change. `message` names the problem and the way out.
+  | { kind: 'conflict'; reason: ConflictReason; message: string }
   // Sign-in and password-reset failures. One kind and one message for every
   // cause — wrong password, unknown email, unconfirmed account — so the
   // response never reveals whether an account exists (M1-B05).
   | { kind: 'auth_failed'; message: string }
   | { kind: 'rate_limited'; retryAfterSeconds: number }
   | { kind: 'unexpected'; correlationId: string };
+
+/** What a `not_found` was looking for. Grows with each aggregate's actions. */
+export type EntityName = 'account';
+
+/** Why a `conflict` refused a change. Grows with each aggregate's actions. */
+export type ConflictReason = 'account_archived';
 
 export function ok<T>(data: T): ActionResult<T> {
   return { ok: true, data };

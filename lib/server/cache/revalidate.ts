@@ -17,7 +17,10 @@ import { tags, type TagName } from './tags';
 
 /** Which tags each mutation invalidates — the matrix, as data. */
 export const INVALIDATES: Readonly<
-  Record<'profileChange', readonly TagName[]>
+  Record<
+    'profileChange' | 'accountChange' | 'accountRemoval',
+    readonly TagName[]
+  >
 > = {
   // Currency and timezone feed every formatted amount and every
   // calendar-date calculation, so a profile change invalidates everything.
@@ -33,10 +36,36 @@ export const INVALIDATES: Readonly<
     'timeline',
     'profile',
   ],
+  // "Create / update account": a new or edited account moves the balances,
+  // the totals, Safe to Spend, and the Timeline's starting balance.
+  accountChange: ['accounts', 'dashboard', 'sts', 'timeline'],
+  // "Archive / delete account": also the transactions and recurring rules
+  // that hang off the account, which leave every list with it.
+  accountRemoval: [
+    'accounts',
+    'transactions',
+    'recurring',
+    'dashboard',
+    'sts',
+    'timeline',
+  ],
 };
 
-export function revalidateForProfileChange(userId: string): void {
-  for (const name of INVALIDATES.profileChange) {
+function invalidate(row: keyof typeof INVALIDATES, userId: string): void {
+  for (const name of INVALIDATES[row]) {
     updateTag(tags[name](userId));
   }
+}
+
+export function revalidateForProfileChange(userId: string): void {
+  invalidate('profileChange', userId);
+}
+
+export function revalidateForAccountChange(userId: string): void {
+  invalidate('accountChange', userId);
+}
+
+/** Archive, restore, and delete: restoring undoes an archive, same row. */
+export function revalidateForAccountRemoval(userId: string): void {
+  invalidate('accountRemoval', userId);
 }

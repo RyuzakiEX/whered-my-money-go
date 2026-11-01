@@ -44,6 +44,10 @@ export const ACCOUNT_MESSAGES = {
   nameTooLong: "That name's a bit long. 60 characters max, please.",
   typeUnknown: 'Pick an account type from the list.',
   idInvalid: "We couldn't find that account.",
+  archived: 'This account is archived. Restore it to make changes.',
+  /** Names the existing account, which may differ from the input in case. */
+  nameTaken: (existing: string) =>
+    `You already have an account called "${existing}". Pick a different name.`,
   openingBalance: {
     empty: 'Enter what the account holds today. 0 is fine.',
     not_a_number:

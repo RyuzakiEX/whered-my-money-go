@@ -148,7 +148,9 @@ helpers call **`updateTag`**, not the `revalidateTag` sketched above: in Next 16
 entry at once, while `revalidateTag(tag, 'max')` may serve stale content while
 it revalidates — and a user who just changed their currency must not see the old
 one on reload. Each later milestone adds its helper and its matrix row to
-`INVALIDATES`.
+`INVALIDATES`. M2-B06 added `revalidateForAccountChange` (create, update) and
+`revalidateForAccountRemoval` (archive, delete, and restore — which undoes an
+archive, so it takes the same row).
 
 ## revalidateTag vs revalidatePath
 

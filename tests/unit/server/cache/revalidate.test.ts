@@ -3,8 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const updateTag = vi.fn();
 vi.mock('next/cache', () => ({ updateTag }));
 
-const { revalidateForProfileChange } =
-  await import('@/lib/server/cache/revalidate');
+const {
+  revalidateForAccountChange,
+  revalidateForAccountRemoval,
+  revalidateForProfileChange,
+} = await import('@/lib/server/cache/revalidate');
 const { tags } = await import('@/lib/server/cache/tags');
 
 /**
@@ -61,5 +64,46 @@ describe('revalidateForProfileChange', () => {
     for (const [tag] of updateTag.mock.calls) {
       expect(tag).toMatch(/^user:u-1:/);
     }
+  });
+});
+
+/**
+ * The account rows of the matrix (M2-B06), written out for the same reason.
+ * "Create / update account" and "Archive / delete account"; restoring an
+ * archived account undoes an archive, so it takes the archive row.
+ */
+const ACCOUNT_CHANGE_ROW = [
+  'accounts',
+  'dashboard',
+  'sts',
+  'timeline',
+] as const;
+const ACCOUNT_REMOVAL_ROW = [
+  'accounts',
+  'transactions',
+  'recurring',
+  'dashboard',
+  'sts',
+  'timeline',
+] as const;
+
+describe.each([
+  [
+    'revalidateForAccountChange',
+    revalidateForAccountChange,
+    ACCOUNT_CHANGE_ROW,
+  ],
+  [
+    'revalidateForAccountRemoval',
+    revalidateForAccountRemoval,
+    ACCOUNT_REMOVAL_ROW,
+  ],
+] as const)('%s', (_, helper, row) => {
+  it('invalidates exactly the documented row, for that user', () => {
+    helper('u-1');
+    const invalidated = updateTag.mock.calls
+      .map(([tag]) => tag as string)
+      .sort();
+    expect(invalidated).toEqual(row.map((name) => tags[name]('u-1')).sort());
   });
 });
