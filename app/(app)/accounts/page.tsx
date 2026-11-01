@@ -11,53 +11,23 @@ import { redirect } from 'next/navigation';
 import { AccountActionsMenu } from '@/components/accounts/account-actions-menu';
 import { AccountCard } from '@/components/accounts/account-card';
 import { AccountDialog } from '@/components/accounts/account-dialog';
-import type { AccountFormValues } from '@/components/accounts/account-form';
+import { DeletedNotice } from '@/components/accounts/deleted-notice';
 import { ActiveAccountList } from '@/components/accounts/active-account-list';
 import { RestoreAccountButton } from '@/components/accounts/restore-account-button';
 import { cn } from '@/components/ui/cn';
 import { spendableBalanceMinor } from '@/lib/core/accounts/spendable-balance';
 import { MixedCurrencyError } from '@/lib/core/money/arithmetic';
 import type { Minor } from '@/lib/core/money/parse';
-import {
-  archiveAccount,
-  createAccount,
-  deleteAccount,
-  restoreAccount,
-} from '@/lib/server/actions/accounts';
 import { listAccounts } from '@/lib/server/queries/accounts';
 import { getProfile } from '@/lib/server/queries/profile';
 import { formatMoney } from '@/lib/utils/format-money';
 
-import { toAccountActionResult, toAccountFormResult } from './action-result';
+import { archive, create, remove, restore } from './actions';
 
 export const metadata: Metadata = { title: 'Accounts' };
 
-// The page's account actions. Each takes the id it acts on; the action
-// re-verifies that the account is the session user's before writing.
-
-async function restore(id: string) {
-  'use server';
-  return toAccountActionResult(await restoreAccount({ id }));
-}
-
-async function archive(id: string) {
-  'use server';
-  return toAccountActionResult(await archiveAccount({ id }));
-}
-
-async function remove(id: string) {
-  'use server';
-  return toAccountActionResult(await deleteAccount({ id }));
-}
-
 const plural = (count: number, one: string, many: string) =>
   `${String(count)} ${count === 1 ? one : many}`;
-
-/** The create dialog's save. Currency comes from the profile, in the action. */
-async function create(values: AccountFormValues) {
-  'use server';
-  return toAccountFormResult(await createAccount(values));
-}
 
 export default async function AccountsPage({
   searchParams,
@@ -76,6 +46,8 @@ export default async function AccountsPage({
   // `?archived=1` shows archived accounts; anything else is the default view,
   // so a hand-edited URL falls back instead of erroring.
   const showArchived = search['archived'] === '1';
+  // Set by a delete on an account's own page, which redirects here.
+  const justDeleted = search['deleted'] === '1';
 
   const active = accounts.filter((account) => account.archivedAt === null);
   const archived = accounts.filter((account) => account.archivedAt !== null);
@@ -94,6 +66,7 @@ export default async function AccountsPage({
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+      {justDeleted ? <DeletedNotice /> : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         {/* Focusable from script: where focus lands after a delete removes
             the card it was on (AccountActionsMenu). */}
@@ -225,6 +198,8 @@ export default async function AccountsPage({
                           <RestoreAccountButton
                             accountName={account.name}
                             restoreAction={restore.bind(null, account.id)}
+                            // The restored card joins this list.
+                            focusAfter="active-heading"
                           />
                           <AccountActionsMenu
                             accountName={account.name}

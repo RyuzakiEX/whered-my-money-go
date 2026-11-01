@@ -42,6 +42,7 @@ export function AccountActionsMenu({
   onArchive,
   deleteAction,
   onDeleted,
+  busy = false,
 }: {
   accountName: string;
   /** Omitted for an archived account, which is restored rather than archived. */
@@ -52,6 +53,8 @@ export function AccountActionsMenu({
    * deleted account's own page). Without it, focus goes to the page <h1>.
    */
   onDeleted?: () => void;
+  /** An action on this account is in flight: the menu cannot reopen yet. */
+  busy?: boolean;
 }) {
   // Portaled into <main>, not the end of <body>, so the menu stays within a
   // landmark (axe `region`) — and not into the card, whose `z-10` actions box
@@ -112,6 +115,8 @@ export function AccountActionsMenu({
             size="icon"
             className="size-11"
             aria-label={`Actions for ${accountName}`}
+            disabled={busy}
+            aria-busy={busy || undefined}
           >
             <EllipsisIcon aria-hidden />
           </Button>
