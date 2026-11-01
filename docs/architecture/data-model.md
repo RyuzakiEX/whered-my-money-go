@@ -272,11 +272,10 @@ The mitigations, in the order we would reach for them:
    rebuild path, not a mutable truth.
 
 > [!IMPORTANT]
-> This decision is a candidate **ADR-0007** — *Derived account balances over a
-> stored mutable balance*. It is a schema-shaping choice with a real performance
-> trade-off and a plausible dissent, which is exactly the bar for an ADR. Write
-> it before M2 lands, so the reasoning is on record before someone "optimises"
-> the view into a column. See [../adr/README.md](../adr/README.md).
+> Recorded as [ADR-0007](../adr/0007-derived-account-balances.md) — *Derive
+> account balances from the ledger rather than storing them* — before M2's
+> `accounts` table landed, so the reasoning is on record before someone
+> "optimises" the view into a column.
 
 `goals.current_amount` follows identical reasoning; see decision 6.
 
@@ -433,13 +432,12 @@ Spec §5. Note the absence of a `balance` column — see
 |---|---|---|---|---|
 | `id` | `uuid` | no | `gen_random_uuid()` | PK |
 | `user_id` | `uuid` | no | — | FK → `auth.users(id) on delete cascade` |
-| `name` | `text` | no | — | Check `length between 1 and 60`. Not unique — two accounts may legitimately be called "Savings" |
-| `type` | `account_type` | no | `'bank'` | Spec §5 |
+| `name` | `text` | no | — | `accounts_name_length`: trimmed length 1–60. **Unique per user, ignoring case** (`accounts_unique_name`) — "GCash" and "gcash" are indistinguishable in an account picker, so the second is refused with a field error naming the conflict (decided 2026-11-01, M2) |
+| `type` | `account_type` | no | — | Spec §5. No default: the form always asks |
 | `opening_balance_minor` | `bigint` | no | `0` | Balance when the account was added. **May be negative** — a credit card starts in debt. This is the one money column without a `> 0` check, and the exception is documented in the constraint |
-| `currency` | `char(3)` | no | — | ISO 4217. Defaults from `profiles.currency` in the Server Action, not in SQL, so the default is visible in the form |
+| `currency` | `char(3)` | no | — | ISO 4217, `accounts_currency_allowed` (the profile allowlist). Taken from `profiles.currency` in the Server Action, not in SQL and never from the client, so the form shows it read-only |
 | `exclude_from_safe_to_spend` | `boolean` | no | `false` | **Additive infrastructure, not a product change** — required by spec §9. See [decision 5](#5-accountsexclude_from_safe_to_spend-boolean) |
-| `is_archived` | `boolean` | no | `false` | **Additive infrastructure, not a product change.** Spec §5 says "delete account", but a hard delete cascades away the transaction history that every past report depends on. Archive hides it from pickers and keeps the ledger intact. Hard delete stays available and is explicit about what it destroys |
-| `display_order` | `smallint` | no | `0` | **Additive infrastructure, not a product change.** Stable account ordering; without it list order is whatever Postgres returns |
+| `archived_at` | `timestamptz` | yes | `null` | **Additive infrastructure, not a product change.** Spec §5 says "delete account", but a hard delete cascades away the transaction history that every past report depends on. Archive hides it from pickers and keeps the ledger intact; "archived" means `archived_at is not null`, and the timestamp records when. Hard delete stays available and is explicit about what it destroys |
 | `created_at` | `timestamptz` | no | `now()` | |
 | `updated_at` | `timestamptz` | no | `now()` | Trigger |
 
@@ -457,7 +455,7 @@ creates the profile.
 | `color` | `text` | no | `'#64748B'` | Spec §7 "choose category color". Check against `^#[0-9A-Fa-f]{6}$` — an unvalidated color string reaches a chart and a CSS context |
 | `icon` | `text` | yes | `null` | Spec §7 "choose category icon". A name from the app's icon set, not a URL or markup |
 | `is_default` | `boolean` | no | `false` | **Additive infrastructure, not a product change.** Marks a seeded category, so onboarding can offer "reset to defaults" and so analytics can tell customised users from default ones |
-| `is_archived` | `boolean` | no | `false` | **Additive infrastructure, not a product change.** Same reasoning as `accounts.is_archived` — deleting a category orphans historical transactions |
+| `archived_at` | `timestamptz` | yes | `null` | **Additive infrastructure, not a product change.** Same reasoning as `accounts.archived_at` — deleting a category orphans historical transactions |
 | `created_at` | `timestamptz` | no | `now()` | |
 | `updated_at` | `timestamptz` | no | `now()` | Trigger |
 
@@ -667,6 +665,9 @@ names to translate a violation into a user-facing message
 | `goals_target_positive` | `goals` | `check (target_amount_minor > 0)` | |
 | `goal_contributions_amount_positive` | `goal_contributions` | `check (amount_minor > 0)` | |
 | `recurring_amount_positive` | `recurring_transactions` | `check (amount_minor > 0)` | |
+| `accounts_unique_name` | `accounts` | `unique (user_id, lower(name))` (an index) | Two accounts a human cannot tell apart. Mapped to a field error on the name by the Server Action |
+| `accounts_name_length` | `accounts` | `check (char_length(btrim(name)) between 1 and 60)` | A blank or runaway name breaks every card and picker |
+| `accounts_currency_allowed` | `accounts` | `check (currency in ('PHP', 'USD', 'EUR', 'JPY'))` | The profile allowlist, so no account holds a currency the app cannot format |
 | — | `accounts` | *no positivity check on `opening_balance_minor`* | Deliberate exception: a credit card opens negative. Documented as a comment on the column so it does not read as an oversight |
 | `budgets_unique_period` | `budgets` | `unique (user_id, category_id, period_start)` | Two budgets for Food in September is not a state the UI can render or the progress calculation can interpret. Enforced in the database because racing double-submits will otherwise create it |
 | `categories_unique_name` | `categories` | `unique (user_id, lower(name), type)` | Two "Food" expense categories split a user's spending across identical-looking rows and make the breakdown chart nonsense. `lower(name)` because "food" and "Food" are the same category to a human. Same name across *different* types is allowed — an income "Other" and an expense "Other" are different things |
@@ -707,8 +708,8 @@ exist "just in case" cost write throughput and buy nothing.
 | `budgets_user_period_idx` | `(user_id, period_start)` | "This month's budgets" — every dashboard budget-health render (spec §8) |
 | `recurring_next_on_idx` | `(user_id, next_on) where next_on is not null and not is_paused` | Money Timeline (spec §10) and the future materialisation job. Partial index: ended and paused rules are never scanned, so excluding them keeps it small |
 | `goal_contributions_goal_occurred_idx` | `(goal_id, occurred_on)` | `goal_progress`, and the contribution-rate calculation behind spec §13's projected completion date |
-| `categories_user_type_idx` | `(user_id, type) where not is_archived` | Category pickers, which always filter by transaction type |
-| `accounts_user_idx` | `(user_id) where not is_archived` | Account pickers and the balance view |
+| `categories_user_type_idx` | `(user_id, type) where archived_at is null` | Category pickers, which always filter by transaction type |
+| `accounts_user_archived_idx` | `(user_id, archived_at)` | The account list and pickers, with or without archived accounts. `accounts_unique_name` also leads with `user_id`, so no `(user_id)`-only index |
 | `audit_log_user_occurred_idx` | `(user_id, occurred_at desc)` | V2 audit review |
 
 Not created, deliberately:
@@ -766,13 +767,13 @@ lands, so a backend task is unambiguous about which file it creates. Protocol:
 | `0002_enums.sql` | [M1](../../tasks/backlog/m1-auth-and-profile.md) | All six enums. One migration, because tables reference them and splitting them creates ordering puzzles for no gain | 0001 |
 | `0003_profiles.sql` | M1 | `profiles`, its RLS policies, `set_updated_at` trigger | 0002 |
 | `0004_profile_on_signup.sql` | M1 | `on_auth_user_created` trigger + its `security definer` function with `set search_path = ''`. Separate from 0003 so the table and the trigger can be reviewed independently — the trigger is the security-sensitive half | 0003 |
-| `0005_accounts.sql` | [M2](../../tasks/backlog/m3-transactions-and-categories.md) | `accounts` (incl. `opening_balance_minor`, `exclude_from_safe_to_spend`, `is_archived`), RLS, indexes, trigger | 0003 |
+| `0005_accounts.sql` | [M2](../../tasks/backlog/m2-accounts.md) | `accounts` (incl. `opening_balance_minor`, `exclude_from_safe_to_spend`, `archived_at`), RLS, indexes, trigger | 0003 |
 | `0006_categories.sql` | M2 | `categories`, `categories_unique_name`, RLS, indexes, trigger | 0003 |
 | `0007_seed_default_categories.sql` | M2 | Extends the sign-up function to seed spec §7's defaults. A separate migration because it *changes* 0004's function, and that change must be reviewable on its own | 0004, 0006 |
 | `0008_transactions.sql` | M2 | `transactions` with every column including `transfer_group_id`, `transfer_direction`, and `recurring_transaction_id` **as a plain uuid with no FK yet** — the FK arrives in 0010 once the target table exists. All checks, all indexes, RLS with [cross-table ownership](rls-policies.md#cross-table-ownership) | 0005, 0006 |
 | `0009_transactions_category_type_guard.sql` | M2 | The category-type trigger. Separate so the trigger is a reviewable unit and can be dropped independently if it proves too strict | 0008 |
 | `0010_recurring_transactions.sql` | M2 | `recurring_transactions` (empty; V2 uses it), RLS, `recurring_next_on_idx`, **and the deferred FK `transactions.recurring_transaction_id → recurring_transactions(id)`**. Shipped in M2 rather than V2 so no later migration alters a populated `transactions` table | 0008 |
-| `0011_account_balances_view.sql` | M2 | `account_balances` view with `security_invoker = true` | 0008, 0010 |
+| `0011_account_balances_view.sql` | [M3](../../tasks/backlog/m3-transactions-and-categories.md) (M2-B02, moved 2026-11-01) | `account_balances` view with `security_invoker = true` | 0008, 0010 |
 | `0012_budgets.sql` | [M5](../../tasks/backlog/m5-budgets.md) | `budgets`, `budgets_unique_period`, `budgets_period_start_is_month_start`, RLS, `budgets_user_period_idx` | 0006 |
 | `0013_budgets_expense_only_guard.sql` | M5 | The expense-category-only trigger | 0012 |
 | `0014_goals.sql` | [M6](../../tasks/backlog/m6-goals.md) | `goals` **without** `current_amount`, RLS, indexes, trigger | 0005 |
@@ -808,7 +809,7 @@ schema-change task with the reason, rather than a quiet `alter table`.
 - **No `balance` column on `accounts`, no `current_amount` on `goals`.** Derived.
   See decisions 4 and 6. This is the single largest departure from spec §22, and
   it changes no product behaviour — both values are still shown, just computed.
-- **No soft-delete `deleted_at` columns.** `is_archived` on `accounts` and
+- **No soft-delete `deleted_at` columns.** `archived_at` on `accounts` and
   `categories` covers the real requirement — keeping history while hiding the
   row from pickers. A general soft-delete pattern means every query needs a
   `where deleted_at is null` that someone will forget, and the one they forget
