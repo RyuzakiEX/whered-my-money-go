@@ -27,7 +27,7 @@ edit, delete.
 |---|---|---|
 | [x] | M2-B01 | `[M2][BE] Create account_type enum and accounts table` |
 | [x] | M2-B03 | `[M2][BE] Add RLS policies for accounts` |
-| [ ] | M2-B04 | `[M2][SH] Define account Zod schemas and domain types` |
+| [x] | M2-B04 | `[M2][SH] Define account Zod schemas and domain types` |
 | [ ] | M2-B05 | `[M2][BE] Implement account queries and mappers` |
 | [ ] | M2-B06 | `[M2][BE] Implement account Server Actions` |
 | [ ] | M2-F01 | `[M2][FE] Build the accounts list page` |
