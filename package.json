@@ -31,7 +31,7 @@
   },
   "dependencies": {
     "@supabase/ssr": "0.12.7",
-    "@supabase/supabase-js": "2.118.0",
+    "@supabase/supabase-js": "2.119.0",
     "class-variance-authority": "0.7.1",
     "cn": "0.5.0",
     "lucide-react": "1.64.0",
@@ -68,7 +68,7 @@
     "postcss": "8.5.32",
     "prettier": "3.9.10",
     "shadcn": "4.23.0",
-    "supabase": "2.122.0",
+    "supabase": "3.1.0",
     "tailwindcss": "4.3.3",
     "typescript": "5.9.3",
     "typescript-eslint": "8.72.0",
