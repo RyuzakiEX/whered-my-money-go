@@ -24,6 +24,10 @@ import {
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 
+/** A native <select> styled like Input, at the 44px touch target. */
+export const SELECT_CLASSES =
+  'h-11 w-full rounded-lg border border-input bg-transparent px-2.5 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive md:text-sm dark:bg-input/30';
+
 /** What a form shows after a submission. */
 export interface FormState {
   /** Field errors, keyed by input name. */

@@ -5,7 +5,11 @@ import {
   SUPPORTED_CURRENCIES,
 } from '@/lib/core/money/currency';
 import { parseMoneyToMinor } from '@/lib/core/money/parse';
-import { formatMoney } from '@/lib/utils/format-money';
+import {
+  currencySymbol,
+  formatMinorForInput,
+  formatMoney,
+} from '@/lib/utils/format-money';
 
 /**
  * The display edge for money (docs/domain/money-and-rounding.md#display-formatting).
@@ -62,4 +66,45 @@ describe('formatMoney', () => {
     expect(formatMoney(100, 'USD')).toBe(first);
     expect(formatMoney(100, 'USD', { signDisplay: 'always' })).not.toBe(first);
   });
+});
+
+describe('currencySymbol', () => {
+  it.each([
+    ['PHP', '₱'],
+    ['USD', '$'],
+    ['EUR', '€'],
+  ] as const)('%s -> %s', (currency, symbol) => {
+    expect(currencySymbol(currency)).toBe(symbol);
+  });
+
+  it('gives JPY a yen sign', () => {
+    expect(currencySymbol('JPY')).toMatch(/^[¥￥]$/);
+  });
+});
+
+describe('formatMinorForInput', () => {
+  it.each([
+    [0, 'PHP', '0.00'],
+    [100_050, 'PHP', '1000.50'],
+    [123_456_789, 'PHP', '1234567.89'],
+    [-350_000, 'PHP', '-3500.00'],
+    [-0, 'PHP', '0.00'],
+    [1_234, 'JPY', '1234'],
+  ] as const)(
+    '%d %s -> %s (no symbol, no grouping)',
+    (minor, currency, text) => {
+      expect(formatMinorForInput(minor, currency)).toBe(text);
+    },
+  );
+
+  it.each(SUPPORTED_CURRENCIES)(
+    'round-trips through the parser for %s',
+    (currency) => {
+      for (const minor of [0, 7, 100_050, -987_654_321]) {
+        expect(
+          parseMoneyToMinor(formatMinorForInput(minor, currency), currency),
+        ).toEqual({ ok: true, minor });
+      }
+    },
+  );
 });

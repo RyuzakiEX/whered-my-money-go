@@ -148,6 +148,19 @@ export function accountUpdateSchema(currency: SupportedCurrency) {
     .transform(withMinorBalance);
 }
 
+/**
+ * The opening balance's minor units, or null when the text does not parse.
+ * Lets the form tell `1000.50` and `1,000.50` apart from a real change
+ * without doing any arithmetic of its own.
+ */
+export function openingBalanceMinorOf(
+  text: string,
+  currency: SupportedCurrency,
+): number | null {
+  const parsed = parseMoneyToMinor(text, currency);
+  return parsed.ok ? parsed.minor : null;
+}
+
 /** Archive, restore, and delete name an account and nothing else. */
 export const accountIdSchema = z.strictObject({ id: accountId });
 

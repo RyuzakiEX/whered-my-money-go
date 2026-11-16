@@ -16,7 +16,11 @@ import {
   type SubmitEvent,
 } from 'react';
 
-import { ErrorSummary, TextField } from '@/components/auth/form-parts';
+import {
+  ErrorSummary,
+  SELECT_CLASSES,
+  TextField,
+} from '@/components/auth/form-parts';
 import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { SUPPORTED_CURRENCIES } from '@/lib/core/money/currency';
@@ -40,8 +44,6 @@ const CURRENCY_NAMES: Record<ProfileValues['currency'], string> = {
 };
 
 const SAVED = 'Saved. Looking good.';
-const SELECT_CLASSES =
-  'h-11 w-full rounded-lg border border-input bg-transparent px-2.5 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive md:text-sm dark:bg-input/30';
 
 export function ProfileForm({
   initial,

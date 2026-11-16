@@ -3,6 +3,7 @@
 // Lives in app/ because components/ may not import lib/server: the page is
 // the one layer allowed to know both sides (as app/(auth)/form-state.ts).
 
+import type { AccountSaveResult } from '@/components/accounts/account-form';
 import type { AccountActionResult } from '@/components/accounts/action-result';
 import type { ActionResult } from '@/lib/server/result';
 
@@ -37,4 +38,17 @@ export function toAccountActionResult(
     case 'rate_limited':
       return { ok: false, message: "That didn't work. Refresh and try again." };
   }
+}
+
+/**
+ * The account form's view of a create or update: field errors stay keyed by
+ * field (a taken name lands on the name input), anything else is one message.
+ */
+export function toAccountFormResult(
+  result: ActionResult<unknown>,
+): AccountSaveResult {
+  if (!result.ok && result.error.kind === 'validation') {
+    return { ok: false, fields: result.error.fields };
+  }
+  return toAccountActionResult(result);
 }

@@ -6,6 +6,7 @@ import {
   accountCreateSchema,
   accountIdSchema,
   accountUpdateSchema,
+  openingBalanceMinorOf,
 } from '@/lib/validation/accounts';
 
 /**
@@ -205,5 +206,20 @@ describe('accountIdSchema', () => {
       false,
     );
     expect(accountIdSchema.safeParse({ id: '1' }).success).toBe(false);
+  });
+});
+
+describe('openingBalanceMinorOf', () => {
+  it.each([
+    ['1000.50', 100_050],
+    ['1,000.50', 100_050],
+    ['1000.5', 100_050],
+    ['-2,500', -250_000],
+  ] as const)('%s -> %d', (text, minor) => {
+    expect(openingBalanceMinorOf(text, 'PHP')).toBe(minor);
+  });
+
+  it.each(['', 'abc', '1.5'])('%j -> null in JPY', (text) => {
+    expect(openingBalanceMinorOf(text, 'JPY')).toBeNull();
   });
 });
