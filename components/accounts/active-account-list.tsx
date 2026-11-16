@@ -11,15 +11,14 @@
 // (state-and-caching.md#optimistic-ui), so while an action is in flight it is
 // only marked busy.
 
-import { useRouter } from 'next/navigation';
-import { useOptimistic, useRef, useTransition, type ReactNode } from 'react';
-import { toast } from 'sonner';
+import { useOptimistic, useRef, type ReactNode } from 'react';
 
 import type { Account } from '@/lib/core/types';
 
 import { AccountActionsMenu } from './account-actions-menu';
 import { AccountCard } from './account-card';
-import { settle, type AccountActionResult } from './action-result';
+import type { AccountActionResult } from './action-result';
+import { useArchiveWithUndo } from './use-archive-with-undo';
 
 type IdAction = (id: string) => Promise<AccountActionResult>;
 
@@ -43,49 +42,13 @@ export function ActiveAccountList({
     NO_HIDDEN,
     (current: ReadonlySet<string>, id: string) => new Set(current).add(id),
   );
-  const [pending, startTransition] = useTransition();
-  const router = useRouter();
+  const { archive, pending } = useArchiveWithUndo();
   // Where focus goes when the card it was on leaves the list.
   const headingRef = useRef<HTMLHeadingElement>(null);
 
   function focusHeading() {
     requestAnimationFrame(() => {
       headingRef.current?.focus();
-    });
-  }
-
-  function report(result: AccountActionResult, success: () => void) {
-    if (result.ok) {
-      success();
-      return;
-    }
-    toast.error(result.message);
-    if (result.unconfirmed) router.refresh();
-  }
-
-  function undo({ id, name }: Account) {
-    startTransition(async () => {
-      const result = await settle(() => restoreAction(id));
-      report(result, () => toast.success(`${name} is back.`));
-    });
-  }
-
-  function archive(account: Account) {
-    // The menu closes onto a trigger that is about to disappear.
-    focusHeading();
-    startTransition(async () => {
-      hide(account.id);
-      const result = await settle(() => archiveAction(account.id));
-      report(result, () =>
-        toast.success(`${account.name} archived. It's resting, not gone.`, {
-          action: {
-            label: 'Undo',
-            onClick: () => {
-              undo(account);
-            },
-          },
-        }),
-      );
     });
   }
 
@@ -117,7 +80,16 @@ export function ActiveAccountList({
                   <AccountActionsMenu
                     accountName={account.name}
                     onArchive={() => {
-                      archive(account);
+                      // The menu closes onto a trigger about to disappear.
+                      focusHeading();
+                      archive(
+                        account.name,
+                        () => archiveAction(account.id),
+                        () => restoreAction(account.id),
+                        () => {
+                          hide(account.id);
+                        },
+                      );
                     }}
                     deleteAction={() => deleteAction(account.id)}
                     onDeleted={focusHeading}

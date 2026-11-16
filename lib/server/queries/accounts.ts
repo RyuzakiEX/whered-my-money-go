@@ -12,6 +12,7 @@
 // account's balance is its opening balance — correct, because no transaction
 // can exist yet. The view will replace `balanceOf` below and nothing else.
 
+import { cache } from 'react';
 import { z } from 'zod';
 
 import type { Minor } from '@/lib/core/money/parse';
@@ -66,8 +67,13 @@ export async function listAccounts(
  * One account, archived or not, or null — when it does not exist, belongs to
  * another user, or the id is malformed. The caller cannot tell which, by
  * design: "not yours" must read as "not there".
+ *
+ * Wrapped in React's cache(): an account page reads it for its metadata and
+ * again for its body, and one request should ask the database once.
  */
-export async function getAccount(id: string): Promise<Account | null> {
+export const getAccount = cache(async function getAccount(
+  id: string,
+): Promise<Account | null> {
   if (!isUuid(id)) return null;
   const supabase = await createServerSupabaseClient();
   const userId = await sessionUserId(supabase);
@@ -82,7 +88,7 @@ export async function getAccount(id: string): Promise<Account | null> {
   if (error) throw new Error(`account read failed: ${error.code}`);
 
   return data ? toDomainAccount(data, balanceOf(data)) : null;
-}
+});
 
 /**
  * Balances for a set of accounts, in one query. Ids that are malformed, missing,

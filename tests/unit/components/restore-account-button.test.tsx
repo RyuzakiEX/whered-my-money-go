@@ -28,8 +28,18 @@ async function clickRestore(action: () => Promise<AccountActionResult>) {
 }
 
 describe('RestoreAccountButton', () => {
-  it('announces a restore', async () => {
+  it('announces a restore and moves focus to the page heading', async () => {
+    render(
+      <main>
+        <h1 tabIndex={-1}>Accounts</h1>
+      </main>,
+    );
     await clickRestore(() => Promise.resolve({ ok: true }));
+    await waitFor(() => {
+      expect(document.activeElement).toBe(
+        screen.getByRole('heading', { name: 'Accounts' }),
+      );
+    });
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith(
         'Old bank is back. Welcome home.',
