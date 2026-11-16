@@ -30,7 +30,7 @@ answerable: add income, add an expense, categorise, search, edit, delete.
 | Done | ID | Title |
 |---|---|---|
 | [x] | M3-B01 | `[M3][BE] Create category_type enum and categories table` |
-| [ ] | M3-B02 | `[M3][BE] Seed spec §7 default categories on profile creation` |
+| [x] | M3-B02 | `[M3][BE] Seed spec §7 default categories on profile creation` |
 | [ ] | M3-B03 | `[M3][BE] Create transaction_type enum and transactions table` |
 | [ ] | M2-B02 | `[M2][BE] Create the account_balances view` *(moved from M2)* |
 | [ ] | M3-B04 | `[M3][BE] Add RLS with cross-table ownership for categories and transactions` |

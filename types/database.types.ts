@@ -76,7 +76,9 @@ export type Database = {
             [_ in never]: never
           }
           Functions: {
-            [_ in never]: never
+            "seed_default_categories":
+{ Args: { "p_user_id": string }; Returns: undefined
+                           }
           }
           Enums: {
             "account_type": "cash"|"bank"|"ewallet"|"credit_card"|"savings"|"other","category_type": "income"|"expense"
