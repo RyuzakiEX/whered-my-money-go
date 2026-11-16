@@ -42,6 +42,20 @@ export type Database = {
                   Relationships: [
                     
                   ]
+                },"categories": {
+                  Row: {
+                    "archived_at": string | null,"color": string,"created_at": string,"icon": string,"id": string,"is_default": boolean,"name": string,"type": Database["public"]['Enums']["category_type"],"updated_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "archived_at"?: string | null,"color"?: string,"created_at"?: string,"icon": string,"id"?: string,"is_default"?: boolean,"name": string,"type": Database["public"]['Enums']["category_type"],"updated_at"?: string,"user_id": string
+                  }
+                  Update: {
+                    "archived_at"?: string | null,"color"?: string,"created_at"?: string,"icon"?: string,"id"?: string,"is_default"?: boolean,"name"?: string,"type"?: Database["public"]['Enums']["category_type"],"updated_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"profiles": {
                   Row: {
                     "created_at": string,"currency": string,"display_name": string | null,"id": string,"onboarding_completed_at": string | null,"timezone": string,"updated_at": string
@@ -65,7 +79,7 @@ export type Database = {
             [_ in never]: never
           }
           Enums: {
-            "account_type": "cash"|"bank"|"ewallet"|"credit_card"|"savings"|"other"
+            "account_type": "cash"|"bank"|"ewallet"|"credit_card"|"savings"|"other","category_type": "income"|"expense"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -185,7 +199,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "account_type": ["cash", "bank", "ewallet", "credit_card", "savings", "other"]
+            "account_type": ["cash", "bank", "ewallet", "credit_card", "savings", "other"],"category_type": ["income", "expense"]
           }
         }
 } as const
