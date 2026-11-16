@@ -598,11 +598,11 @@ M1-B01 ships the profile half
 and timezone come from the column defaults, a sign-up `display_name` is taken
 from `raw_user_meta_data` when it fits the length check (otherwise `null`, so
 sign-up never fails on a cosmetic field), and `on conflict (id) do nothing`
-makes a second invocation a no-op. The categories insert below arrives with
-M2's `seed_default_categories` migration.
+makes a second invocation a no-op. M3-B02 added the categories half
+(`supabase/migrations/20261116160439_seed_default_categories.sql`):
 
 ```sql
-create function public.handle_new_user()
+create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer
@@ -613,18 +613,22 @@ begin
   values (new.id, /* trimmed metadata name, or null */)
   on conflict (id) do nothing;
 
-  insert into public.categories (user_id, name, type, color, is_default)
-  select new.id, d.name, d.type, d.color, true
-  from public.default_categories d;   -- spec §7 defaults
+  -- Same transaction: both exist, or the sign-up fails.
+  perform public.seed_default_categories(new.id);
 
   return new;
 end;
 $$;
-
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute function public.handle_new_user();
 ```
+
+`public.seed_default_categories(uuid)` holds spec §7's sixteen defaults as an
+inline `values` list rather than a lookup table, because a lookup table would be
+one more public table needing RLS for no benefit. It inserts with
+`on conflict (user_id, lower(name), type) do nothing`, so calling it again
+inserts nothing. It is **not** `security definer`: the trigger already runs as
+the owner. Execute is revoked from `public`, `anon` and `authenticated`, because
+a callable seed would let a user write rows under another user's id. The same
+migration backfills users who signed up before it existed.
 
 Why a trigger rather than a Server Action after sign-up:
 

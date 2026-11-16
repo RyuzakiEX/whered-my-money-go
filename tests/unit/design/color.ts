@@ -92,3 +92,13 @@ export function tokensIn(css: string, selector: string): Map<string, string> {
   }
   return out;
 }
+
+const HEX = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i;
+
+/** An opaque `#rrggbb` colour, as stored in `categories.color`. */
+export function parseHex(value: string): Rgba {
+  const m = HEX.exec(value);
+  if (!m) throw new Error(`Not a #rrggbb colour: ${value}`);
+  const [r, g, b] = [m[1]!, m[2]!, m[3]!].map((h) => parseInt(h, 16) / 255);
+  return { r: r!, g: g!, b: b!, a: 1 };
+}

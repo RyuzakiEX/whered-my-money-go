@@ -761,7 +761,9 @@ M1-B01/B02 landed `create_set_updated_at` (planned `0001`'s function),
 `create_profile_on_signup` (`0004`). M2-B01/B03 landed `create_accounts`
 (the `account_type` enum with its table) and `enable_accounts_rls` (`0005`).
 M3-B01 landed `create_categories` (with the `category_type` enum) and
-`enable_categories_rls` (`0006`; the categories half of M3-B04). `pgcrypto` needs no migration
+`enable_categories_rls` (`0006`; the categories half of M3-B04).
+M3-B02 landed `seed_default_categories` (`0007`): the seed function, the
+re-created sign-up function that calls it, and a backfill for existing users. `pgcrypto` needs no migration
 (`gen_random_uuid()` is core since Postgres 13), and the enums of `0002` arrive
 with the tables that use them (M2-B01 onwards) — `profiles` uses none. Each row below names what a milestone's `type:contract` task
 lands, so a backend task is unambiguous about which file it creates. Protocol:
@@ -775,7 +777,7 @@ lands, so a backend task is unambiguous about which file it creates. Protocol:
 | `0004_profile_on_signup.sql` | M1 | `on_auth_user_created` trigger + its `security definer` function with `set search_path = ''`. Separate from 0003 so the table and the trigger can be reviewed independently — the trigger is the security-sensitive half | 0003 |
 | `0005_accounts.sql` | [M2](../../tasks/backlog/m2-accounts.md) | `accounts` (incl. `opening_balance_minor`, `exclude_from_safe_to_spend`, `archived_at`), RLS, indexes, trigger | 0003 |
 | `0006_categories.sql` | M3 | `categories`, `categories_unique_name`, RLS, indexes, trigger | 0003 |
-| `0007_seed_default_categories.sql` | M2 | Extends the sign-up function to seed spec §7's defaults. A separate migration because it *changes* 0004's function, and that change must be reviewable on its own | 0004, 0006 |
+| `0007_seed_default_categories.sql` | M3 | Extends the sign-up function to seed spec §7's defaults. A separate migration because it *changes* 0004's function, and that change must be reviewable on its own | 0004, 0006 |
 | `0008_transactions.sql` | M2 | `transactions` with every column including `transfer_group_id`, `transfer_direction`, and `recurring_transaction_id` **as a plain uuid with no FK yet** — the FK arrives in 0010 once the target table exists. All checks, all indexes, RLS with [cross-table ownership](rls-policies.md#cross-table-ownership) | 0005, 0006 |
 | `0009_transactions_category_type_guard.sql` | M2 | The category-type trigger. Separate so the trigger is a reviewable unit and can be dropped independently if it proves too strict | 0008 |
 | `0010_recurring_transactions.sql` | M2 | `recurring_transactions` (empty; V2 uses it), RLS, `recurring_next_on_idx`, **and the deferred FK `transactions.recurring_transaction_id → recurring_transactions(id)`**. Shipped in M2 rather than V2 so no later migration alters a populated `transactions` table | 0008 |
