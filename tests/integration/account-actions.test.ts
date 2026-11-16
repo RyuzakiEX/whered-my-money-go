@@ -396,6 +396,40 @@ describe('deleteAccount', () => {
     expect(updateTag).not.toHaveBeenCalled();
   });
 
+  // M3-B03: an account with transactions is never deleted — that would
+  // rewrite the user's history. The action answers `blocked` with the count
+  // and the way out, and the `on delete restrict` foreign key makes it so.
+  it('answers blocked, with the transaction count, for an account with transactions', async () => {
+    const id = await seed(a.id);
+    const rows = [1, 2, 3].map((n) => ({
+      user_id: a.id,
+      account_id: id,
+      amount_minor: n * 100,
+      currency: 'PHP',
+      type: 'expense' as const,
+      occurred_on: '2026-11-16',
+    }));
+    const { error } = await admin.from('transactions').insert(rows);
+    expect(error).toBeNull();
+
+    expect(await actions.deleteAccount({ id })).toEqual({
+      ok: false,
+      error: {
+        kind: 'blocked',
+        reason: 'account_has_transactions',
+        transactionCount: 3,
+        suggestion: 'archive',
+      },
+    });
+    expect(await rowOf(id)).not.toBeNull();
+    const { count } = await admin
+      .from('transactions')
+      .select('id', { count: 'exact', head: true })
+      .eq('account_id', id);
+    expect(count).toBe(3);
+    expect(updateTag).not.toHaveBeenCalled();
+  });
+
   it('refuses a malformed id as validation, before any query', async () => {
     expect(await actions.deleteAccount({ id: 'nope' })).toMatchObject({
       ok: false,

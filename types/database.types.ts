@@ -70,6 +70,32 @@ export type Database = {
                   Relationships: [
                     
                   ]
+                },"transactions": {
+                  Row: {
+                    "account_id": string,"amount_minor": number,"category_id": string | null,"created_at": string,"currency": string,"description": string | null,"id": string,"occurred_on": string,"transfer_direction": Database["public"]['Enums']["transfer_direction"] | null,"transfer_group_id": string | null,"type": Database["public"]['Enums']["transaction_type"],"updated_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "account_id": string,"amount_minor": number,"category_id"?: string | null,"created_at"?: string,"currency": string,"description"?: string | null,"id"?: string,"occurred_on": string,"transfer_direction"?: Database["public"]['Enums']["transfer_direction"] | null,"transfer_group_id"?: string | null,"type": Database["public"]['Enums']["transaction_type"],"updated_at"?: string,"user_id": string
+                  }
+                  Update: {
+                    "account_id"?: string,"amount_minor"?: number,"category_id"?: string | null,"created_at"?: string,"currency"?: string,"description"?: string | null,"id"?: string,"occurred_on"?: string,"transfer_direction"?: Database["public"]['Enums']["transfer_direction"] | null,"transfer_group_id"?: string | null,"type"?: Database["public"]['Enums']["transaction_type"],"updated_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "transactions_account_id_fkey"
+      columns: ["account_id"]
+isOneToOne: false
+      referencedRelation: "accounts"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "transactions_category_id_fkey"
+      columns: ["category_id"]
+isOneToOne: false
+      referencedRelation: "categories"
+      referencedColumns: ["id"]
+    }
+                  ]
                 }
           }
           Views: {
@@ -81,7 +107,7 @@ export type Database = {
                            }
           }
           Enums: {
-            "account_type": "cash"|"bank"|"ewallet"|"credit_card"|"savings"|"other","category_type": "income"|"expense"
+            "account_type": "cash"|"bank"|"ewallet"|"credit_card"|"savings"|"other","category_type": "income"|"expense","transaction_type": "income"|"expense"|"transfer","transfer_direction": "out"|"in"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -201,7 +227,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "account_type": ["cash", "bank", "ewallet", "credit_card", "savings", "other"],"category_type": ["income", "expense"]
+            "account_type": ["cash", "bank", "ewallet", "credit_card", "savings", "other"],"category_type": ["income", "expense"],"transaction_type": ["income", "expense", "transfer"],"transfer_direction": ["out", "in"]
           }
         }
 } as const

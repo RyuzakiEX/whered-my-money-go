@@ -21,6 +21,13 @@ export function toAccountActionResult(
       };
     case 'conflict':
       return { ok: false, message: error.message };
+    // M3-B03: deleting would erase the account's history. Say why, and name
+    // the way out — the same menu's Archive.
+    case 'blocked':
+      return {
+        ok: false,
+        message: blockedDeleteMessage(error.transactionCount),
+      };
     case 'unauthenticated':
       return {
         ok: false,
@@ -38,6 +45,16 @@ export function toAccountActionResult(
     case 'rate_limited':
       return { ok: false, message: "That didn't work. Refresh and try again." };
   }
+}
+
+export function blockedDeleteMessage(transactionCount: number): string {
+  const held =
+    transactionCount === 1
+      ? 'It has 1 transaction'
+      : transactionCount > 1
+        ? `It has ${String(transactionCount)} transactions`
+        : 'It still has transactions';
+  return `${held}, and deleting it would erase that history. Archive it instead: it leaves your lists and totals, and its history stays put.`;
 }
 
 /**

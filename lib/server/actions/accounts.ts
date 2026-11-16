@@ -341,10 +341,50 @@ export async function restoreAccount(
 /**
  * Deletes the account. The ownership re-check IS the write's user_id scope
  * and its row count: a separate read first would add a round trip and answer
- * the same question. In M2 no account can have a transaction; M3-B03 adds
- * the `blocked` result for one that does, with the `on delete restrict`
- * foreign key as the database backstop.
+ * the same question.
+ *
+ * An account with transactions is never deleted: that would rewrite the
+ * user's history. The delete is attempted and the `on delete restrict`
+ * foreign key refuses it, writing nothing, so there is no window between a
+ * count and the delete for a new transaction to slip through. The refusal
+ * becomes `blocked`, with the count and the way out (archive) — never the
+ * raw foreign-key error (M3-B03).
  */
+/** Postgres `foreign_key_violation`: here, transactions.account_id's restrict. */
+const FOREIGN_KEY_VIOLATION = '23503';
+
+/**
+ * The `blocked` answer for an account the restrict kept: how many
+ * transactions it holds, counted as the user. The cross-table insert policy
+ * means only the user's own transactions can reference their account, so the
+ * RLS-scoped count is the whole count.
+ */
+async function blockedDelete(
+  ctx: Context & { userId: string },
+  id: string,
+): Promise<ActionResult<never>> {
+  const { count, error } = await ctx.supabase
+    .from('transactions')
+    .select('id', { count: 'exact', head: true })
+    .eq('account_id', id)
+    .eq('user_id', ctx.userId);
+  if (error) {
+    return unexpected(ctx, 'account.read_failed', error.code, ctx.userId);
+  }
+  logger.info('account.delete_blocked', {
+    requestId: ctx.requestId,
+    userId: ctx.userId,
+    action: ctx.action,
+    outcome: 'failure',
+  });
+  return fail({
+    kind: 'blocked',
+    reason: 'account_has_transactions',
+    transactionCount: count ?? 0,
+    suggestion: 'archive',
+  });
+}
+
 export async function deleteAccount(
   input: unknown,
 ): Promise<ActionResult<AccountRef>> {
@@ -364,6 +404,7 @@ export async function deleteAccount(
     .eq('user_id', userId)
     .select('id');
   if (error) {
+    if (error.code === FOREIGN_KEY_VIOLATION) return blockedDelete(ctx, id);
     return unexpected(ctx, 'account.write_failed', error.code, userId);
   }
   if (data.length !== 1) return NOT_FOUND;

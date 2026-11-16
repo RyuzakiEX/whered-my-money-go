@@ -25,6 +25,10 @@ export function toFormState(result: ActionResult<unknown>): FormState {
       return { message: "We couldn't find that. Refresh and try again." };
     case 'conflict':
       return { message: error.message };
+    case 'blocked':
+      return {
+        message: "That can't be done right now. Refresh and try again.",
+      };
     case 'unexpected':
       return {
         message: `Something went wrong on our side. Try again, and if it keeps happening, mention code ${error.correlationId}.`,

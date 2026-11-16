@@ -10,8 +10,9 @@
 // button, and the dialog stays open until the server answers, so a failure
 // is shown where the user is looking.
 //
-// TODO(M3-B03): the `blocked` result — an account with transactions — turns
-// this dialog into "it has N transactions; archive it instead".
+// An account with transactions is never deleted (M3-B03): the server answers
+// `blocked`, and the dialog shows why and points at Archive, in the alert
+// below its description.
 
 import { ArchiveIcon, EllipsisIcon, Trash2Icon } from 'lucide-react';
 import { useRouter } from 'next/navigation';

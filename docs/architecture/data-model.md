@@ -82,7 +82,7 @@ for the formula that drives several of the choices below.
 │  id PK · user_id · account_id · category_id? · amount_minor > 0           │
 │  type (income|expense|transfer) · currency · occurred_on                 │
 │  transfer_group_id? ──┐  pairs exactly two rows: the out-leg and in-leg   │
-│  recurring_transaction_id?  provenance of a materialised occurrence       │
+│  transfer_direction? (out|in)  which leg; signs it in account_balances    │
 └───────────────────────┼──────────────────────────────────────────────────┘
                         │
                         └─▶ self-referential grouping, not a FK to a table
@@ -378,6 +378,7 @@ closed set like transaction direction is a feature, not a limitation.
 |---|---|---|
 | `account_type` | `cash`, `bank`, `ewallet`, `credit_card`, `savings`, `other` | Spec §5's examples. GCash and Maya are both `ewallet` — the provider is a display concern, not a type |
 | `transaction_type` | `income`, `expense`, `transfer` | Spec §6. Carries the sign of `amount_minor` |
+| `transfer_direction` | `out`, `in` | Additive infrastructure (M3-B03). Which leg of a transfer a row is, so `account_balances` can sign it |
 | `category_type` | `income`, `expense` | Spec §7. No `transfer` value — transfers are uncategorised by constraint |
 | `budget_period` | `monthly` | Spec §11 is monthly-only for MVP. The enum exists so `weekly`/`yearly` are an `alter type`, not a column change |
 | `recurrence_frequency` | `weekly`, `biweekly`, `monthly`, `quarterly`, `yearly` | Spec §15 verbatim |
@@ -467,15 +468,16 @@ Spec §6. The core table; every index and constraint here earns its place.
 |---|---|---|---|---|
 | `id` | `uuid` | no | `gen_random_uuid()` | PK |
 | `user_id` | `uuid` | no | — | FK → `auth.users(id) on delete cascade` |
-| `account_id` | `uuid` | no | — | FK → `accounts(id) on delete restrict`. **`restrict`, not `cascade`**: deleting an account must not silently erase its financial history. The Server Action either archives the account or requires the user to confirm the transaction deletion explicitly |
+| `account_id` | `uuid` | no | — | FK → `accounts(id) on delete restrict`. **`restrict`, not `cascade`**: deleting an account must not silently erase its financial history. `deleteAccount` attempts the delete, and the restrict refuses it. The action answers `blocked` with the transaction count and suggests archiving (M3-B03). Deleting the auth user still removes everything, because that cascade reaches the transactions too |
 | `category_id` | `uuid` | yes | `null` | FK → `categories(id) on delete set null`. Nullable for two reasons: transfers must be uncategorised (constraint below), and an uncategorised expense is a legitimate intermediate state — forcing a category at entry time makes the spec §33 "add a transaction in seconds" flow slower |
-| `amount_minor` | `bigint` | no | — | Check `> 0`. Sign from `type`. See [decision 1](#1-amount_minor-bigint-always-positive-sign-lives-in-type) |
-| `currency` | `char(3)` | no | — | Denormalized and immutable. See [decision 7](#7-currency-char3-denormalized-onto-transactions) |
+| `amount_minor` | `bigint` | no | — | `transactions_amount_positive`. Sign from `type` (and `transfer_direction` for a transfer leg). See [decision 1](#1-amount_minor-bigint-always-positive-sign-lives-in-type) |
+| `currency` | `char(3)` | no | — | Denormalized and immutable; `transactions_currency_allowed` (the profile allowlist). See [decision 7](#7-currency-char3-denormalized-onto-transactions) |
 | `type` | `transaction_type` | no | — | `income` / `expense` / `transfer` |
-| `description` | `text` | yes | `null` | Spec §6. Check `length <= 200`. Never logged — see [observability.md](observability.md) |
-| `occurred_on` | `date` | no | `current_date` | Spec §22 `date`, renamed. See [decision 2](#2-occurred_on-date--spec-calls-it-date) |
+| `description` | `text` | yes | `null` | Spec §6. `transactions_description_length`: `length <= 200`. Never logged — see [observability.md](observability.md) |
+| `occurred_on` | `date` | no | — | Spec §22 `date`, renamed. See [decision 2](#2-occurred_on-date--spec-calls-it-date). **No default** (M3-B03, 2026-11-16): the database's `current_date` is the server's UTC date, not the user's, so a Manila evening would be dated tomorrow. The Server Action always supplies the date in the profile timezone |
 | `transfer_group_id` | `uuid` | yes | `null` | Pairs the two legs of a transfer. See [decision 3](#3-transfer_group_id-uuid-pairs-the-two-legs-of-a-transfer). **Additive infrastructure, not a product change** |
-| `recurring_transaction_id` | `uuid` | yes | `null` | FK → `recurring_transactions(id) on delete set null`. Provenance of a materialised occurrence, so the timeline can dedupe a projected occurrence against the real transaction that fulfilled it. **Additive infrastructure, not a product change** — required by [../domain/recurrence.md](../domain/recurrence.md). V2 populates it; the column ships in M2 so no later migration rewrites the table |
+| `transfer_direction` | `transfer_direction` | yes | `null` | `out` on the source leg, `in` on the destination. Two legs are otherwise identical by type and amount, so `account_balances` signs a leg by this column. `transactions_transfer_direction_shape`: set exactly when `type = 'transfer'`. **Additive infrastructure, not a product change** |
+| `recurring_transaction_id` | `uuid` | yes | `null` | FK → `recurring_transactions(id) on delete set null`. Provenance of a materialised occurrence, so the timeline can dedupe a projected occurrence against the real transaction that fulfilled it. **Additive infrastructure, not a product change** — required by [../domain/recurrence.md](../domain/recurrence.md). **Not yet created: it arrives with `recurring_transactions` in [M8-B04](../../tasks/backlog/m8-money-timeline.md)** (decided 2026-11-16, M3-B03). Adding a nullable column with no default is a metadata-only change in Postgres, so adding it later rewrites nothing, and a column with no target and no writer until M8 would only invite guesses about what it means |
 | `created_at` | `timestamptz` | no | `now()` | Distinct from `occurred_on` |
 | `updated_at` | `timestamptz` | no | `now()` | Trigger |
 
@@ -540,11 +542,11 @@ Spec §13. `current_amount` is **not** a column — see
 
 ### `recurring_transactions`
 
-Spec §15 — a **V2 feature**, but the table ships in M2 alongside `transactions`.
-Reason: `transactions.recurring_transaction_id` needs a target for its foreign
-key, and adding both a table and a column to a populated `transactions` table
-later is a strictly worse migration than shipping an empty table now. The V2
-work is UI, actions, and recurrence expansion — no schema change.
+Spec §15. Created in [M8-B04](../../tasks/backlog/m8-money-timeline.md), together
+with `transactions.recurring_transaction_id` and its foreign key. An earlier
+plan shipped both with `transactions` in M2 to avoid altering a populated table.
+M3-B03 deferred them (2026-11-16), because a nullable column with no default
+is added without rewriting the table.
 
 | Column | Type | Null | Default | Notes |
 |---|---|---|---|---|
@@ -674,6 +676,8 @@ names to translate a violation into a user-facing message
 | `categories_name_length` | `categories` | `check (char_length(btrim(name)) between 1 and 40)` | A blank name is an unlabeled chip; a long one breaks the picker and the chart legend |
 | `categories_color_hex` | `categories` | `check (color ~ '^#[0-9A-Fa-f]{6}$')` | The value is rendered into chart fills and CSS. Only a literal hex colour can reach either |
 | `categories_icon_format` | `categories` | `check (icon ~ '^[a-z0-9]+(-[a-z0-9]+)*$' and char_length(icon) <= 40)` | An icon is a name looked up in the app's icon set. The pattern makes a URL or markup unrepresentable |
+| `transactions_currency_allowed` | `transactions` | `check (currency in ('PHP', 'USD', 'EUR', 'JPY'))` | The profile allowlist, as on `accounts` |
+| `transactions_description_length` | `transactions` | `check (description is null or char_length(description) <= 200)` | A free-text field that reaches every list row |
 | `transactions_transfer_no_category` | `transactions` | `check (type <> 'transfer' or category_id is null)` | A transfer is not spending. Categorising one double-counts it in the breakdown and inflates budget usage. Enforced in the database because a Server Action bug, a CSV import, or a hand-run SQL statement would otherwise create it silently |
 | `transactions_transfer_group_shape` | `transactions` | `check ((type = 'transfer') = (transfer_group_id is not null))` | A transfer without a group id is an orphan leg; a group id on a non-transfer is meaningless |
 | `transactions_transfer_direction_shape` | `transactions` | `check ((type = 'transfer') = (transfer_direction is not null))` | Required for `account_balances` to sign a leg |
@@ -706,7 +710,7 @@ exist "just in case" cost write throughput and buy nothing.
 |---|---|---|
 | `transactions_user_occurred_idx` | `(user_id, occurred_on desc)` | The transaction list — spec §6's history view, sorted newest-first, and the keyset pagination in [system-architecture.md](system-architecture.md#performance-and-scale). `desc` matters: it matches the scan direction, so no sort node |
 | `transactions_user_category_occurred_idx` | `(user_id, category_id, occurred_on)` | Spending-by-category (spec §8), budget progress (spec §11), category trends (spec §16). Ascending here because these are range scans over a period, not top-N |
-| `transactions_user_account_occurred_idx` | `(user_id, account_id, occurred_on)` | `account_balances`, and per-account history (spec §5) |
+| `transactions_account_idx` | `(account_id)` | `account_balances`, per-account history (spec §5), and the restrict check when an account is deleted. Not `(user_id, account_id, occurred_on)` as first planned (M3-B03): an account belongs to one user, so `user_id` adds nothing to the lookup |
 | `transactions_transfer_group_idx` | `(transfer_group_id) where transfer_group_id is not null` | Fetching the sibling leg on edit or delete. Partial — most rows are not transfers, so a full index is mostly dead weight |
 | `budgets_user_period_idx` | `(user_id, period_start)` | "This month's budgets" — every dashboard budget-health render (spec §8) |
 | `recurring_next_on_idx` | `(user_id, next_on) where next_on is not null and not is_paused` | Money Timeline (spec §10) and the future materialisation job. Partial index: ended and paused rules are never scanned, so excluding them keeps it small |
@@ -762,6 +766,9 @@ M1-B01/B02 landed `create_set_updated_at` (planned `0001`'s function),
 (the `account_type` enum with its table) and `enable_accounts_rls` (`0005`).
 M3-B01 landed `create_categories` (with the `category_type` enum) and
 `enable_categories_rls` (`0006`; the categories half of M3-B04).
+M3-B03 landed `create_transactions` (with the `transaction_type` and
+`transfer_direction` enums), `transactions_category_type_guard` (`0009`), and
+`enable_transactions_rls` (the transactions half of M3-B04).
 M3-B02 landed `seed_default_categories` (`0007`): the seed function, the
 re-created sign-up function that calls it, and a backfill for existing users. `pgcrypto` needs no migration
 (`gen_random_uuid()` is core since Postgres 13), and the enums of `0002` arrive
@@ -778,10 +785,10 @@ lands, so a backend task is unambiguous about which file it creates. Protocol:
 | `0005_accounts.sql` | [M2](../../tasks/backlog/m2-accounts.md) | `accounts` (incl. `opening_balance_minor`, `exclude_from_safe_to_spend`, `archived_at`), RLS, indexes, trigger | 0003 |
 | `0006_categories.sql` | M3 | `categories`, `categories_unique_name`, RLS, indexes, trigger | 0003 |
 | `0007_seed_default_categories.sql` | M3 | Extends the sign-up function to seed spec §7's defaults. A separate migration because it *changes* 0004's function, and that change must be reviewable on its own | 0004, 0006 |
-| `0008_transactions.sql` | M2 | `transactions` with every column including `transfer_group_id`, `transfer_direction`, and `recurring_transaction_id` **as a plain uuid with no FK yet** — the FK arrives in 0010 once the target table exists. All checks, all indexes, RLS with [cross-table ownership](rls-policies.md#cross-table-ownership) | 0005, 0006 |
-| `0009_transactions_category_type_guard.sql` | M2 | The category-type trigger. Separate so the trigger is a reviewable unit and can be dropped independently if it proves too strict | 0008 |
-| `0010_recurring_transactions.sql` | M2 | `recurring_transactions` (empty; V2 uses it), RLS, `recurring_next_on_idx`, **and the deferred FK `transactions.recurring_transaction_id → recurring_transactions(id)`**. Shipped in M2 rather than V2 so no later migration alters a populated `transactions` table | 0008 |
-| `0011_account_balances_view.sql` | [M3](../../tasks/backlog/m3-transactions-and-categories.md) (M2-B02, moved 2026-11-01) | `account_balances` view with `security_invoker = true` | 0008, 0010 |
+| `0008_transactions.sql` | M3 | `transactions` with `transfer_group_id` and `transfer_direction`, all checks, all indexes. RLS with [cross-table ownership](rls-policies.md#cross-table-ownership) is in its own migration in the same PR. `recurring_transaction_id` is deferred to M8-B04 | 0005, 0006 |
+| `0009_transactions_category_type_guard.sql` | M3 | The category-type trigger. Separate so the trigger is a reviewable unit and can be dropped independently if it proves too strict | 0008 |
+| `0010_recurring_transactions.sql` | [M8](../../tasks/backlog/m8-money-timeline.md) (M8-B04) | `recurring_transactions`, RLS, its `next_date` index, **and `transactions.recurring_transaction_id` with its FK** | 0008 |
+| `0011_account_balances_view.sql` | [M3](../../tasks/backlog/m3-transactions-and-categories.md) (M2-B02, moved 2026-11-01) | `account_balances` view with `security_invoker = true` | 0008 |
 | `0012_budgets.sql` | [M5](../../tasks/backlog/m5-budgets.md) | `budgets`, `budgets_unique_period`, `budgets_period_start_is_month_start`, RLS, `budgets_user_period_idx` | 0006 |
 | `0013_budgets_expense_only_guard.sql` | M5 | The expense-category-only trigger | 0012 |
 | `0014_goals.sql` | [M6](../../tasks/backlog/m6-goals.md) | `goals` **without** `current_amount`, RLS, indexes, trigger | 0005 |
@@ -796,19 +803,18 @@ Three ordering rules that are non-obvious and cost real time when broken:
    value to an existing enum in the same transaction that uses it also fails —
    `alter type ... add value` cannot be used in the same transaction in older
    Postgres, so enum changes always get their own migration.
-2. **The `recurring_transaction_id` foreign key is deferred to 0010.** The
-   column ships in 0008 so `transactions` is never altered after it holds data;
-   the constraint waits for its target. This is the standard fix for a circular
-   dependency between two tables that reference each other.
+2. **`recurring_transaction_id` arrives with its target table (M8-B04).** A
+   nullable column with no default is a metadata-only `alter table`, so adding
+   it to a populated `transactions` table rewrites nothing. An earlier plan
+   shipped it in 0008 to avoid that alter; M3-B03 deferred it.
 3. **Every table's RLS policies land in the same migration as the table.** Never
    a follow-up. A table that exists for even one deploy without policies is
    either wide open or entirely inaccessible, and both have shipped in real
    projects. The CI check in [rls-policies.md](rls-policies.md#ci-enforcement)
    fails the build if a table appears without RLS enabled.
 
-Milestones M3 (dashboard shell), M4 (dashboard core), and M7 (Safe to Spend and
-timeline) create **no migrations**. Every table they need exists by M2, and the
-work is queries, `lib/core` math, and UI. If one of them turns out to need a
+M4 (dashboard core) and M7 (Safe to Spend) create **no migrations**. Every
+table they need exists by M3, and the work is queries, `lib/core` math, and UI. If one of them turns out to need a
 column, that is a signal this document got something wrong — record it as a
 schema-change task with the reason, rather than a quiet `alter table`.
 
