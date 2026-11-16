@@ -69,8 +69,10 @@ const TYPE_OPTION_LABELS: Readonly<Record<AccountType, string>> = {
 
 const FORM_PROBLEM =
   "Something in this form isn't right. Check it and try again.";
+// The save may have gone through before the response was lost: check, don't
+// just retry into a "name taken" error.
 const NETWORK_FAILURE =
-  "We couldn't reach the server. Your details are still here; try again.";
+  "We couldn't confirm that saved. Your details are still here; check your accounts before trying again.";
 
 export const EMPTY_ACCOUNT: AccountFormValues = {
   name: '',

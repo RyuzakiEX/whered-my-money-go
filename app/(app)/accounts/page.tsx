@@ -8,15 +8,22 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
+import { AccountActionsMenu } from '@/components/accounts/account-actions-menu';
 import { AccountCard } from '@/components/accounts/account-card';
 import { AccountDialog } from '@/components/accounts/account-dialog';
 import type { AccountFormValues } from '@/components/accounts/account-form';
+import { ActiveAccountList } from '@/components/accounts/active-account-list';
 import { RestoreAccountButton } from '@/components/accounts/restore-account-button';
 import { cn } from '@/components/ui/cn';
 import { spendableBalanceMinor } from '@/lib/core/accounts/spendable-balance';
 import { MixedCurrencyError } from '@/lib/core/money/arithmetic';
 import type { Minor } from '@/lib/core/money/parse';
-import { createAccount, restoreAccount } from '@/lib/server/actions/accounts';
+import {
+  archiveAccount,
+  createAccount,
+  deleteAccount,
+  restoreAccount,
+} from '@/lib/server/actions/accounts';
 import { listAccounts } from '@/lib/server/queries/accounts';
 import { getProfile } from '@/lib/server/queries/profile';
 import { formatMoney } from '@/lib/utils/format-money';
@@ -25,10 +32,22 @@ import { toAccountActionResult, toAccountFormResult } from './action-result';
 
 export const metadata: Metadata = { title: 'Accounts' };
 
-/** The page's restore, bound to one account id on the server. */
+// The page's account actions. Each takes the id it acts on; the action
+// re-verifies that the account is the session user's before writing.
+
 async function restore(id: string) {
   'use server';
   return toAccountActionResult(await restoreAccount({ id }));
+}
+
+async function archive(id: string) {
+  'use server';
+  return toAccountActionResult(await archiveAccount({ id }));
+}
+
+async function remove(id: string) {
+  'use server';
+  return toAccountActionResult(await deleteAccount({ id }));
 }
 
 const plural = (count: number, one: string, many: string) =>
@@ -76,7 +95,11 @@ export default async function AccountsPage({
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Accounts</h1>
+        {/* Focusable from script: where focus lands after a delete removes
+            the card it was on (AccountActionsMenu). */}
+        <h1 tabIndex={-1} className="text-2xl font-semibold outline-none">
+          Accounts
+        </h1>
         {active.length > 0 ? (
           <AccountDialog
             mode="create"
@@ -119,62 +142,52 @@ export default async function AccountsPage({
           />
         </section>
       ) : (
-        <>
-          <section
-            aria-labelledby="total-heading"
-            className="flex flex-col gap-1 rounded-xl bg-card p-6 ring-1 ring-foreground/10"
-          >
-            <h2
-              id="total-heading"
-              className="text-sm font-medium text-muted-foreground"
+        <ActiveAccountList
+          accounts={active}
+          archiveAction={archive}
+          restoreAction={restore}
+          deleteAction={remove}
+          total={
+            <section
+              aria-labelledby="total-heading"
+              className="flex flex-col gap-1 rounded-xl bg-card p-6 ring-1 ring-foreground/10"
             >
-              Spendable total
-            </h2>
-            {totalMinor === null ? (
-              <p className="text-base">
-                Some of your accounts aren&apos;t in {profile.currency}, your
-                profile currency, so we can&apos;t add them into one total. Each
-                account still shows its own balance.
-              </p>
-            ) : (
-              <>
-                <p
-                  data-testid="spendable-total"
-                  className={cn(
-                    'text-4xl font-semibold tabular-nums',
-                    totalMinor < 0 && 'text-destructive',
-                  )}
-                >
-                  {formatMoney(totalMinor, profile.currency)}
+              <h2
+                id="total-heading"
+                className="text-sm font-medium text-muted-foreground"
+              >
+                Spendable total
+              </h2>
+              {totalMinor === null ? (
+                <p className="text-base">
+                  Some of your accounts aren&apos;t in {profile.currency}, your
+                  profile currency, so we can&apos;t add them into one total.
+                  Each account still shows its own balance.
                 </p>
-                <p className="text-sm text-muted-foreground">
-                  {spendableCount === 0
-                    ? 'All your accounts are set aside, so none count as spendable.'
-                    : `Across ${plural(spendableCount, 'account you can spend from', 'accounts you can spend from')}.`}
-                  {spendableCount > 0 && excludedCount > 0
-                    ? ` ${plural(excludedCount, 'set-aside account is', 'set-aside accounts are')} not counted.`
-                    : null}
-                </p>
-              </>
-            )}
-          </section>
-
-          <section
-            aria-labelledby="active-heading"
-            className="flex flex-col gap-3"
-          >
-            <h2 id="active-heading" className="text-lg font-medium">
-              Your accounts
-            </h2>
-            <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {active.map((account) => (
-                <li key={account.id} className="flex">
-                  <AccountCard account={account} />
-                </li>
-              ))}
-            </ul>
-          </section>
-        </>
+              ) : (
+                <>
+                  <p
+                    data-testid="spendable-total"
+                    className={cn(
+                      'text-4xl font-semibold tabular-nums',
+                      totalMinor < 0 && 'text-destructive',
+                    )}
+                  >
+                    {formatMoney(totalMinor, profile.currency)}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {spendableCount === 0
+                      ? 'All your accounts are set aside, so none count as spendable.'
+                      : `Across ${plural(spendableCount, 'account you can spend from', 'accounts you can spend from')}.`}
+                    {spendableCount > 0 && excludedCount > 0
+                      ? ` ${plural(excludedCount, 'set-aside account is', 'set-aside accounts are')} not counted.`
+                      : null}
+                  </p>
+                </>
+              )}
+            </section>
+          }
+        />
       )}
 
       {archived.length > 0 ? (
@@ -208,10 +221,16 @@ export default async function AccountsPage({
                     <AccountCard
                       account={account}
                       actions={
-                        <RestoreAccountButton
-                          accountName={account.name}
-                          restoreAction={restore.bind(null, account.id)}
-                        />
+                        <>
+                          <RestoreAccountButton
+                            accountName={account.name}
+                            restoreAction={restore.bind(null, account.id)}
+                          />
+                          <AccountActionsMenu
+                            accountName={account.name}
+                            deleteAction={remove.bind(null, account.id)}
+                          />
+                        </>
                       }
                     />
                   </li>

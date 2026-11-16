@@ -10,6 +10,8 @@ import { RestoreAccountButton } from '@/components/accounts/restore-account-butt
 
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 vi.mock('sonner', () => ({ toast }));
+const router = vi.hoisted(() => ({ refresh: vi.fn() }));
+vi.mock('next/navigation', () => ({ useRouter: () => router }));
 
 afterEach(() => {
   cleanup();
@@ -50,9 +52,10 @@ describe('RestoreAccountButton', () => {
     await clickRestore(() => Promise.reject(new Error('Failed to fetch')));
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith(
-        expect.stringMatching(/couldn't reach the server/),
+        expect.stringMatching(/couldn't confirm that with the server/),
       );
     });
+    expect(router.refresh).toHaveBeenCalledTimes(1);
     expect(
       screen.getByRole<HTMLButtonElement>('button', {
         name: 'Restore Old bank',

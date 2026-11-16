@@ -2,6 +2,10 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+// Static, not imported inside a test: a cold import of the page and its
+// client components can outlast the first test's timeout. vi.mock is hoisted
+// above it, so the page still sees the mocks.
+import AccountsPage from '@/app/(app)/accounts/page';
 import type { Account } from '@/lib/core/types';
 
 /**
@@ -13,6 +17,7 @@ vi.mock('next/navigation', () => ({
   redirect: (to: string) => {
     throw new Error(`redirect ${to}`);
   },
+  useRouter: () => ({ refresh: vi.fn() }),
 }));
 const profile = { current: { currency: 'PHP' } as { currency: string } | null };
 vi.mock('@/lib/server/queries/profile', () => ({
@@ -61,7 +66,6 @@ function account(overrides: Partial<Account> = {}): Account {
 const plain = (text: string | null) => (text ?? '').replace(/[  ]/g, ' ');
 
 async function renderPage(search: Record<string, string> = {}) {
-  const { default: AccountsPage } = await import('@/app/(app)/accounts/page');
   return render(await AccountsPage({ searchParams: Promise.resolve(search) }));
 }
 

@@ -233,7 +233,7 @@ describe('AccountForm validation', () => {
     await userEvent.type(balanceInput(), '25');
     await userEvent.click(submit());
     expect((await screen.findByRole('alert')).textContent).toMatch(
-      /couldn.t reach the server/,
+      /couldn.t confirm that saved/,
     );
     expect(nameInput().value).toBe('BPI');
     expect(balanceInput().value).toBe('25');
