@@ -10,7 +10,7 @@
 // text here; the shared parser turns it into minor units, on submit here and
 // again in the action.
 
-import { useEffect, useState, useTransition, type SubmitEvent } from 'react';
+import { useState, useTransition, type SubmitEvent } from 'react';
 
 import {
   ErrorSummary,
@@ -109,10 +109,6 @@ export function AccountForm({
   const [message, setMessage] = useState<string | undefined>();
   const [pending, startTransition] = useTransition();
 
-  useEffect(() => {
-    onPendingChange?.(pending);
-  }, [pending, onPendingChange]);
-
   // The same amount written differently (`1000.50`, `1,000.50`) is not a
   // change: compare what the parser reads, falling back to the text.
   const initialMinor = openingBalanceMinorOf(initial.openingBalance, currency);
@@ -189,11 +185,17 @@ export function AccountForm({
     }
 
     startTransition(async () => {
+      // Reported from the request itself, not from `pending`: the transition
+      // is still pending while this callback shows the result, and a user
+      // pressing Escape at a field error must not be held in the dialog.
+      onPendingChange?.(true);
       let result: AccountSaveResult;
       try {
         result = await saveAction(values);
       } catch {
         result = { ok: false, message: NETWORK_FAILURE };
+      } finally {
+        onPendingChange?.(false);
       }
       if (result.ok) {
         onSaved(values);

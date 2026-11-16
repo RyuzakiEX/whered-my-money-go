@@ -19,7 +19,7 @@ cannot be demonstrated, it was scoped wrong.
 |---|---|---|---|---|---|
 | **M0** | [Foundation & Toolchain](backlog/m0-foundation.md) | `██████████` | 14/14 | 100% | done |
 | **M1** | [Auth & Profile](backlog/m1-auth-and-profile.md) | `██████████` | 13/13 | 100% | done |
-| **M2** | [Accounts](backlog/m2-accounts.md) | `█████████░` | 9/10 | 90% | in progress |
+| **M2** | [Accounts](backlog/m2-accounts.md) | `██████████` | 10/10 | 100% | done |
 | **M3** | [Transactions & Categories](backlog/m3-transactions-and-categories.md) | `░░░░░░░░░░` | 0/16 | 0% | not started |
 | **M4** | [Dashboard Core](backlog/m4-dashboard-core.md) | `░░░░░░░░░░` | 0/10 | 0% | not started |
 | **M5** | [Budgets](backlog/m5-budgets.md) | `░░░░░░░░░░` | 0/10 | 0% | not started |
@@ -27,7 +27,7 @@ cannot be demonstrated, it was scoped wrong.
 | **M7** | [Safe to Spend ⭐](backlog/m7-safe-to-spend.md) | `░░░░░░░░░░` | 0/10 | 0% | not started |
 | **M8** | [Money Timeline ⭐](backlog/m8-money-timeline.md) | `░░░░░░░░░░` | 0/13 | 0% | not started |
 | **M9** | [MVP Hardening & Launch](backlog/m9-mvp-hardening-and-launch.md) | `░░░░░░░░░░` | 0/10 | 0% | not started |
-| | **MVP total** | `███░░░░░░░` | **36/116** | **31%** | |
+| | **MVP total** | `███░░░░░░░` | **37/116** | **32%** | |
 
 ## Contents
 
@@ -144,10 +144,10 @@ these are the milestone-level checks.
 
 ### M2 — Accounts
 
-- [ ] A user can create, view, edit, archive, and delete accounts; deleting an account with transactions is blocked and offers archive
-- [ ] `account_balances` returns correct balances including both legs of transfers
-- [ ] pgTAP proves user B cannot read or write user A's accounts
-- [ ] Spec §31 Q1 is answerable in the UI
+- [x] A user can create, view, edit, archive, and delete accounts — *`tests/e2e/accounts.spec.ts` (M2-B07)*. Blocking the delete of an account with transactions moved to [M3-B03](backlog/m3-transactions-and-categories.md) on 2026-11-01: M2 has no transactions to block on
+- *Moved to M3 with M2-B02 on 2026-11-01:* `account_balances` returns correct balances including both legs of transfers — the view sums a table M3 creates
+- [x] pgTAP proves user B cannot read or write user A's accounts — *M2-B03*
+- [x] Spec §31 Q1 is answerable in the UI — *the accounts list's spendable total, asserted by `accounts.spec.ts`*
 
 ### M3 — Transactions & Categories
 

@@ -12,13 +12,13 @@ edit, delete.
 
 ## Exit criteria
 
-- [ ] A user can create, view, edit, archive, and delete accounts
-- [ ] Balances are derived, never a stored column — until [M3](m3-transactions-and-categories.md) creates transactions, an account's balance is its opening balance *(amended 2026-11-01: the `account_balances` view, transfer-leg correctness, and the index moved to M3 with M2-B02, because the view sums a table M3 creates)*
+- [x] A user can create, view, edit, archive, and delete accounts — *M2-F01..F04; `tests/e2e/accounts.spec.ts` (M2-B07) walks every one*
+- [x] Balances are derived, never a stored column — until [M3](m3-transactions-and-categories.md) creates transactions, an account's balance is its opening balance *(amended 2026-11-01: the `account_balances` view, transfer-leg correctness, and the index moved to M3 with M2-B02, because the view sums a table M3 creates)* — *M2-B05: `balanceMinor` is computed in the query, never read from a column*
 - [x] pgTAP proves user B cannot read, update, delete, or insert into user A's accounts — *M2-B03; `supabase/tests/rls/accounts_test.sql`, each policy weakened in turn to watch it fail*
-- [ ] Two accounts cannot share a name case-insensitively within one user *(confirmed 2026-11-01 over data-model.md's earlier "not unique" — two identical names are indistinguishable in a picker)*
-- [ ] Opening balances are entered as decimal text and stored as integer minor units
-- [ ] Spec §31 Q1 — "How much money do I have?" — is answerable in the UI
-- [ ] Account detail renders a transaction-history region that is empty until [M3](m3-transactions-and-categories.md)
+- [x] Two accounts cannot share a name case-insensitively within one user *(confirmed 2026-11-01 over data-model.md's earlier "not unique" — two identical names are indistinguishable in a picker)* — *`accounts_unique_name` (M2-B01); the E2E's `gcash` after `GCash` gets the inline error*
+- [x] Opening balances are entered as decimal text and stored as integer minor units — *M2-B04 schemas, M2-F02 form; the E2E types `20,000` and `1500.50`*
+- [x] Spec §31 Q1 — "How much money do I have?" — is answerable in the UI — *the accounts list's spendable total; the E2E asserts it equals the sum of the cards, through edit, archive, restore, and delete*
+- [x] Account detail renders a transaction-history region that is empty until [M3](m3-transactions-and-categories.md) — *M2-F04*
 - *Moved to M3 on 2026-11-01: "deleting an account that has transactions is blocked and the UI offers archive instead" — with no transactions table there is nothing to block on or test against*
 
 ## Progress
@@ -34,7 +34,7 @@ edit, delete.
 | [x] | M2-F02 | `[M2][FE] Build the account create and edit dialog` |
 | [x] | M2-F03 | `[M2][FE] Build the delete and archive flow` |
 | [x] | M2-F04 | `[M2][FE] Build the account detail page` |
-| [ ] | M2-B07 | `[M2][DO] Add the account CRUD E2E test` |
+| [x] | M2-B07 | `[M2][DO] Add the account CRUD E2E test` |
 
 ## Tasks
 
