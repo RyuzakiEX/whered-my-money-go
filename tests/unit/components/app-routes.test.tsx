@@ -44,12 +44,13 @@ const ROUTES: [string, string, () => Promise<{ default: ComponentType }>][] = [
   ['Budget', 'budget', () => import('@/app/(app)/budget/page')],
   ['Goals', 'goals', () => import('@/app/(app)/goals/page')],
   ['Timeline', 'timeline', () => import('@/app/(app)/timeline/page')],
-  ['Accounts', 'accounts', () => import('@/app/(app)/accounts/page')],
   ['Reports', 'reports', () => import('@/app/(app)/reports/page')],
   ['What If?', 'what-if', () => import('@/app/(app)/what-if/page')],
   ['Settings', 'settings', () => import('@/app/(app)/settings/page')],
 ];
 
+// Accounts left this list when it stopped being a placeholder (M2-F01); its
+// page has its own test, tests/unit/components/accounts-page.test.tsx.
 describe('placeholder routes', () => {
   it.each(ROUTES)(
     '%s renders its name as the page heading',

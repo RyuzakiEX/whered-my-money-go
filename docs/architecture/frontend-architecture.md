@@ -252,20 +252,19 @@ one did, and the browser silently refused the whole file.
 ## Money formatting
 
 ```typescript
-// lib/utils/money.ts   — NOT lib/core
+// lib/utils/format-money.ts   — NOT lib/core   (built in M2-F01)
 
 export function formatMoney(
-  amountMinor: number,
-  currency: string,      // from the profile; 'PHP' default per spec
-  locale: string,
-): string {
-  return new Intl.NumberFormat(locale, {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-  }).format(amountMinor / 100);
-}
+  minor: number,
+  currency: string,      // the account's, or the profile's for a total
+  opts?: { compactZeroFraction?: boolean; signDisplay?: 'auto' | 'always'; locale?: string },
+): string;               // 2350000, 'PHP' -> '₱23,500.00'
 ```
+
+The full contract and its table are in
+[../domain/money-and-rounding.md](../domain/money-and-rounding.md#display-formatting).
+Decimals come from the currency (JPY has none), formatters are memoized, and a
+unit test holds the formatter's decimals equal to the parser's.
 
 Rules:
 
@@ -273,7 +272,7 @@ Rules:
   arithmetic on integers; it must not know about locales, and `Intl` output
   varies by ICU version, which would make pure-function tests
   environment-dependent.
-- **`amountMinor / 100` happens only at the display edge.** That is the single
+- **`minor / 10 ** exponent` happens only at the display edge.** That is the single
   permitted place a money value becomes a float, and its result is a string that
   never re-enters arithmetic.
 - **`₱` is the default** (spec's examples throughout), driven by

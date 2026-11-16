@@ -172,6 +172,13 @@ currentBalanceMinor = Σ balance_minor
 
 with credit-card balances contributing their (usually negative) value directly.
 
+**Implemented once, in `lib/core/accounts/spendable-balance.ts`** (M2-F01), as
+`spendableBalanceMinor(accounts, currency)`. It is the accounts list's total,
+and M7-B01 must call it for this term rather than re-derive the sum, so the
+accounts page and the Safe to Spend breakdown cannot disagree. It also skips
+archived accounts and throws `MixedCurrencyError` on a counted account in
+another currency.
+
 ## ExpectedIncome
 
 > Income the user can reasonably expect to receive within `H`, and has not
