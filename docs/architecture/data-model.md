@@ -450,10 +450,10 @@ creates the profile.
 |---|---|---|---|---|
 | `id` | `uuid` | no | `gen_random_uuid()` | PK |
 | `user_id` | `uuid` | no | — | FK → `auth.users(id) on delete cascade`. Categories are per-user copies, not shared rows — a user renaming "Food" must not rename it for everyone, and RLS on a shared table would be far more delicate |
-| `name` | `text` | no | — | Check `length between 1 and 40` |
+| `name` | `text` | no | — | `categories_name_length`: trimmed length 1–40. **Unique per user and type, ignoring case** (`categories_unique_name`) |
 | `type` | `category_type` | no | — | `income` or `expense`. Determines which transaction types may reference it |
-| `color` | `text` | no | `'#64748B'` | Spec §7 "choose category color". Check against `^#[0-9A-Fa-f]{6}$` — an unvalidated color string reaches a chart and a CSS context |
-| `icon` | `text` | yes | `null` | Spec §7 "choose category icon". A name from the app's icon set, not a URL or markup |
+| `color` | `text` | no | `'#64748B'` | Spec §7 "choose category color". `categories_color_hex`: `^#[0-9A-Fa-f]{6}$` — an unvalidated color string reaches a chart and a CSS context |
+| `icon` | `text` | no | — | Spec §7 "choose category icon". A name from the app's icon set (lucide, kebab-case), not a URL or markup — `categories_icon_format`: `^[a-z0-9]+(-[a-z0-9]+)*$`, at most 40 characters. **Not null** (M3-B01, 2026-11-16): every seeded default has an icon and the form always picks one, so a null would only be a rendering branch nobody tests |
 | `is_default` | `boolean` | no | `false` | **Additive infrastructure, not a product change.** Marks a seeded category, so onboarding can offer "reset to defaults" and so analytics can tell customised users from default ones |
 | `archived_at` | `timestamptz` | yes | `null` | **Additive infrastructure, not a product change.** Same reasoning as `accounts.archived_at` — deleting a category orphans historical transactions |
 | `created_at` | `timestamptz` | no | `now()` | |
@@ -671,6 +671,9 @@ names to translate a violation into a user-facing message
 | — | `accounts` | *no positivity check on `opening_balance_minor`* | Deliberate exception: a credit card opens negative. Documented as a comment on the column so it does not read as an oversight |
 | `budgets_unique_period` | `budgets` | `unique (user_id, category_id, period_start)` | Two budgets for Food in September is not a state the UI can render or the progress calculation can interpret. Enforced in the database because racing double-submits will otherwise create it |
 | `categories_unique_name` | `categories` | `unique (user_id, lower(name), type)` | Two "Food" expense categories split a user's spending across identical-looking rows and make the breakdown chart nonsense. `lower(name)` because "food" and "Food" are the same category to a human. Same name across *different* types is allowed — an income "Other" and an expense "Other" are different things |
+| `categories_name_length` | `categories` | `check (char_length(btrim(name)) between 1 and 40)` | A blank name is an unlabeled chip; a long one breaks the picker and the chart legend |
+| `categories_color_hex` | `categories` | `check (color ~ '^#[0-9A-Fa-f]{6}$')` | The value is rendered into chart fills and CSS. Only a literal hex colour can reach either |
+| `categories_icon_format` | `categories` | `check (icon ~ '^[a-z0-9]+(-[a-z0-9]+)*$' and char_length(icon) <= 40)` | An icon is a name looked up in the app's icon set. The pattern makes a URL or markup unrepresentable |
 | `transactions_transfer_no_category` | `transactions` | `check (type <> 'transfer' or category_id is null)` | A transfer is not spending. Categorising one double-counts it in the breakdown and inflates budget usage. Enforced in the database because a Server Action bug, a CSV import, or a hand-run SQL statement would otherwise create it silently |
 | `transactions_transfer_group_shape` | `transactions` | `check ((type = 'transfer') = (transfer_group_id is not null))` | A transfer without a group id is an orphan leg; a group id on a non-transfer is meaningless |
 | `transactions_transfer_direction_shape` | `transactions` | `check ((type = 'transfer') = (transfer_direction is not null))` | Required for `account_balances` to sign a leg |
@@ -708,7 +711,7 @@ exist "just in case" cost write throughput and buy nothing.
 | `budgets_user_period_idx` | `(user_id, period_start)` | "This month's budgets" — every dashboard budget-health render (spec §8) |
 | `recurring_next_on_idx` | `(user_id, next_on) where next_on is not null and not is_paused` | Money Timeline (spec §10) and the future materialisation job. Partial index: ended and paused rules are never scanned, so excluding them keeps it small |
 | `goal_contributions_goal_occurred_idx` | `(goal_id, occurred_on)` | `goal_progress`, and the contribution-rate calculation behind spec §13's projected completion date |
-| `categories_user_type_idx` | `(user_id, type) where archived_at is null` | Category pickers, which always filter by transaction type |
+| `categories_user_type_idx` | `(user_id, type)` | Category pickers, which always filter by transaction type, and the settings list grouped by type. Not partial on `archived_at` (M3-B01): the settings list shows archived categories too, and `categories_unique_name` already leads with `user_id` |
 | `accounts_user_archived_idx` | `(user_id, archived_at)` | The account list and pickers, with or without archived accounts. `accounts_unique_name` also leads with `user_id`, so no `(user_id)`-only index |
 | `audit_log_user_occurred_idx` | `(user_id, occurred_at desc)` | V2 audit review |
 
@@ -756,7 +759,9 @@ merge. **Files are CLI-timestamped** (`20261030015135_create_profiles.sql`), as
 M1-B01/B02 landed `create_set_updated_at` (planned `0001`'s function),
 `create_profiles` + `enable_profiles_rls` (`0003`), and
 `create_profile_on_signup` (`0004`). M2-B01/B03 landed `create_accounts`
-(the `account_type` enum with its table) and `enable_accounts_rls` (`0005`). `pgcrypto` needs no migration
+(the `account_type` enum with its table) and `enable_accounts_rls` (`0005`).
+M3-B01 landed `create_categories` (with the `category_type` enum) and
+`enable_categories_rls` (`0006`; the categories half of M3-B04). `pgcrypto` needs no migration
 (`gen_random_uuid()` is core since Postgres 13), and the enums of `0002` arrive
 with the tables that use them (M2-B01 onwards) — `profiles` uses none. Each row below names what a milestone's `type:contract` task
 lands, so a backend task is unambiguous about which file it creates. Protocol:
@@ -769,7 +774,7 @@ lands, so a backend task is unambiguous about which file it creates. Protocol:
 | `0003_profiles.sql` | M1 | `profiles`, its RLS policies, `set_updated_at` trigger | 0002 |
 | `0004_profile_on_signup.sql` | M1 | `on_auth_user_created` trigger + its `security definer` function with `set search_path = ''`. Separate from 0003 so the table and the trigger can be reviewed independently — the trigger is the security-sensitive half | 0003 |
 | `0005_accounts.sql` | [M2](../../tasks/backlog/m2-accounts.md) | `accounts` (incl. `opening_balance_minor`, `exclude_from_safe_to_spend`, `archived_at`), RLS, indexes, trigger | 0003 |
-| `0006_categories.sql` | M2 | `categories`, `categories_unique_name`, RLS, indexes, trigger | 0003 |
+| `0006_categories.sql` | M3 | `categories`, `categories_unique_name`, RLS, indexes, trigger | 0003 |
 | `0007_seed_default_categories.sql` | M2 | Extends the sign-up function to seed spec §7's defaults. A separate migration because it *changes* 0004's function, and that change must be reviewable on its own | 0004, 0006 |
 | `0008_transactions.sql` | M2 | `transactions` with every column including `transfer_group_id`, `transfer_direction`, and `recurring_transaction_id` **as a plain uuid with no FK yet** — the FK arrives in 0010 once the target table exists. All checks, all indexes, RLS with [cross-table ownership](rls-policies.md#cross-table-ownership) | 0005, 0006 |
 | `0009_transactions_category_type_guard.sql` | M2 | The category-type trigger. Separate so the trigger is a reviewable unit and can be dropped independently if it proves too strict | 0008 |
