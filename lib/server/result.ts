@@ -20,6 +20,15 @@ export type ActionError =
   // The request is well-formed and the record is theirs, but its state
   // forbids the change. `message` names the problem and the way out.
   | { kind: 'conflict'; reason: ConflictReason; message: string }
+  // The record is theirs and the request is well-formed, but other data
+  // depends on it, so the change would destroy history. Carries what the UI
+  // needs to explain the refusal and offer the way out. Nothing was written.
+  | {
+      kind: 'blocked';
+      reason: 'account_has_transactions';
+      transactionCount: number;
+      suggestion: 'archive';
+    }
   // Sign-in and password-reset failures. One kind and one message for every
   // cause — wrong password, unknown email, unconfirmed account — so the
   // response never reveals whether an account exists (M1-B05).

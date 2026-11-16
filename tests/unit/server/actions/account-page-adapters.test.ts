@@ -22,10 +22,22 @@ vi.mock('@/lib/server/actions/accounts', () => ({
   },
   deleteAccount: (input: unknown) => {
     calls.remove(input);
+    const { id } = input as { id: string };
+    const count = Number(/^busy-(\d+)$/.exec(id)?.[1] ?? Number.NaN);
     return Promise.resolve(
-      (input as { id: string }).id === 'gone'
+      id === 'gone'
         ? { ok: false, error: { kind: 'not_found', entity: 'account' } }
-        : { ok: true, data: { id: 'x' } },
+        : Number.isNaN(count)
+          ? { ok: true, data: { id: 'x' } }
+          : {
+              ok: false,
+              error: {
+                kind: 'blocked',
+                reason: 'account_has_transactions',
+                transactionCount: count,
+                suggestion: 'archive',
+              },
+            },
     );
   },
   archiveAccount: vi.fn(),
@@ -38,7 +50,7 @@ const redirect = vi.hoisted(() =>
 );
 vi.mock('next/navigation', () => ({ redirect }));
 
-const { create, update, removeAndLeave } =
+const { create, update, remove, removeAndLeave } =
   await import('@/app/(app)/accounts/actions');
 
 const values = {
@@ -75,6 +87,29 @@ describe('account page adapters', () => {
       openingBalance: undefined,
       excludeFromSafeToSpend: undefined,
     });
+  });
+
+  // M3-B03: a blocked delete says why and offers Archive, counting right.
+  it.each([
+    ['busy-1', 'It has 1 transaction,'],
+    ['busy-3', 'It has 3 transactions,'],
+    ['busy-0', 'It still has transactions,'],
+  ])(
+    'remove explains a blocked delete (%s) and offers Archive',
+    async (id, held) => {
+      const result = await remove(id);
+      expect(result).toEqual({
+        ok: false,
+        message: expect.stringContaining(held),
+      });
+      expect(result.ok || result.message).toContain('Archive it instead');
+    },
+  );
+
+  it('removeAndLeave stays on the page when the delete is blocked', async () => {
+    const result = await removeAndLeave('busy-2');
+    expect(redirect).not.toHaveBeenCalled();
+    expect(result.ok).toBe(false);
   });
 
   it('removeAndLeave redirects to the list only after a delete', async () => {

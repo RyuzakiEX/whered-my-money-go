@@ -366,6 +366,12 @@ them, rather than shipped unused. **M2-B06** added `not_found` (with
 `validation` error on the `name` field, naming the existing account, because
 the form renders it inline. It also added `conflict`, with the one reason
 `account_archived`: an archived account is read-only until restored.
+**M3-B03** added `{ kind: 'blocked'; reason: 'account_has_transactions';
+transactionCount; suggestion: 'archive' }`. `deleteAccount` returns it when the
+`on delete restrict` foreign key refuses the delete (`23503`). The refusal wrote
+nothing, and the count is read afterwards, as the user. The foreign key decides
+rather than a count taken before the delete, so a transaction added between the
+two cannot slip through. The raw error never leaves the action.
 
 Why a union rather than exceptions:
 

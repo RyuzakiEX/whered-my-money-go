@@ -18,7 +18,7 @@ import {
 
 const getClaims = vi.fn();
 /** Each query's result, in the order the action runs them. */
-let results: { data: unknown; error: unknown }[] = [];
+let results: { data: unknown; error: unknown; count?: number }[] = [];
 
 function query(): unknown {
   const next = () =>
@@ -219,6 +219,38 @@ describe('when the account changes between the re-check and the write', () => {
       expect(updateTag).not.toHaveBeenCalled();
     },
   );
+
+  it('deleteAccount answers blocked, never the raw error, when the account has transactions', async () => {
+    const restrict = {
+      data: null,
+      error: {
+        code: '23503',
+        message:
+          'update or delete on table "accounts" violates foreign key constraint "transactions_account_id_fkey" on table "transactions"',
+      },
+    };
+    results = [restrict, { data: null, error: null, count: 2 }];
+    expect(await actions.deleteAccount({ id: ID })).toEqual({
+      ok: false,
+      error: {
+        kind: 'blocked',
+        reason: 'account_has_transactions',
+        transactionCount: 2,
+        suggestion: 'archive',
+      },
+    });
+    expect(updateTag).not.toHaveBeenCalled();
+    expect(logged()).not.toContain('transactions_account_id_fkey');
+  });
+
+  it('deleteAccount answers unexpected when the blocked count itself fails', async () => {
+    results = [
+      { data: null, error: { code: '23503', message: 'fk' } },
+      dbError,
+    ];
+    expect(await actions.deleteAccount({ id: ID })).toEqual(UNEXPECTED);
+    expect(logged()).toContain('account.read_failed');
+  });
 
   it('archiveAccount answers ok, writing nothing, when another request archived it first', async () => {
     results = [
